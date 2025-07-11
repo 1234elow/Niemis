@@ -1,0 +1,1 @@
+module.exports = (sequelize, DataTypes) => { const Model = sequelize.define('ProfessionalDevelopment', {id: {type: DataTypes.UUID, defaultValue: DataTypes.UUIDV4, primaryKey: true}}, {tableName: 'ProfessionalDevelopment.js'}); return Model; };

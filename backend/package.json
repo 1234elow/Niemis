@@ -5,8 +5,8 @@
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "render:start": "npm run migrate && node server.js",
-    "build": "echo 'Backend ready for deployment'",
+    "render:start": "NODE_ENV=production npm run migrate && npm run start",
+    "build": "echo 'Backend build complete - NiEMIS API Server'",
     "dev": "nodemon server.js",
     "test": "jest",
     "test:watch": "jest --watch",
@@ -27,7 +27,6 @@
     "create:demo": "node scripts/create-demo-students.js",
     "validate:deployment": "node scripts/validate-deployment.js",
     "postinstall": "echo 'Installation complete. Run npm run migrate manually if needed.'",
-    "build": "echo 'Backend build complete - NiEMIS API Server'",
     "deploy": "npm run db:setup && npm run validate:deployment",
     "production:start": "NODE_ENV=production node server.js",
     "production:test": "NODE_ENV=production npm run test",
@@ -36,8 +35,7 @@
     "security:audit": "npm audit --audit-level moderate",
     "security:fix": "npm audit fix",
     "lint": "echo 'ESLint not configured - consider adding for production'",
-    "prestart": "echo 'Starting NiEMIS Backend API Server...'",
-    "render:start": "NODE_ENV=production npm run migrate && npm run start"
+    "prestart": "echo 'Starting NiEMIS Backend API Server...'"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",
@@ -52,20 +50,22 @@
     "jsonwebtoken": "^9.0.2",
     "moment": "^2.29.4",
     "morgan": "^1.10.0",
-    "multer": "^1.4.5-lts.1",
+    "multer": "^2.0.1",
     "nodemailer": "^6.9.4",
     "pg": "^8.11.3",
     "sequelize": "^6.32.1",
     "sqlite3": "^5.1.7",
     "twilio": "^4.14.0",
     "uuid": "^9.0.0",
-    "winston": "^3.10.0"
+    "winston": "^3.10.0",
+    "rimraf": "^5.0.5",
+    "glob": "^10.3.10"
   },
   "devDependencies": {
     "jest": "^29.6.2",
     "nodemon": "^3.0.1",
     "sequelize-cli": "^6.6.1",
-    "supertest": "^6.3.3"
+    "supertest": "^7.1.3"
   },
   "keywords": [
     "education",
@@ -74,5 +74,17 @@
     "emis"
   ],
   "author": "Ministry of Educational Transformation - Barbados",
-  "license": "MIT"
+  "license": "MIT",
+  "overrides": {
+    "rimraf": "^5.0.5",
+    "glob": "^10.3.10", 
+    "superagent": "^10.2.2",
+    "are-we-there-yet": "^4.0.2",
+    "npmlog": "^7.0.1",
+    "gauge": "^5.0.1",
+    "fstream": false,
+    "inflight": "^1.0.6",
+    "@npmcli/move-file": "^3.0.3",
+    "lodash.isequal": false
+  }
 }
