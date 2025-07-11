@@ -5,7 +5,8 @@
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "render:start": "node server.js",
+    "render:start": "npm run migrate && node server.js",
+    "build": "echo 'Backend ready for deployment'",
     "dev": "nodemon server.js",
     "test": "jest",
     "test:watch": "jest --watch",

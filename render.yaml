@@ -2,7 +2,7 @@ services:
   # Backend API Service
   - type: web
     name: niemis-backend
-    env: node
+    runtime: node
     plan: starter
     buildCommand: cd backend && npm install && npm run build
     startCommand: cd backend && npm run render:start
@@ -43,7 +43,7 @@ services:
   # Frontend Web Service
   - type: web
     name: niemis-frontend
-    env: static
+    runtime: static
     plan: starter
     buildCommand: cd frontend && npm install && npm run build
     staticPublishPath: frontend/dist
