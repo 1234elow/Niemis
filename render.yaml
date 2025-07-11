@@ -1,0 +1,63 @@
+services:
+  # Backend API Service
+  - type: web
+    name: niemis-backend
+    env: node
+    plan: starter
+    buildCommand: cd backend && npm install && npm run build
+    startCommand: cd backend && npm run render:start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: JWT_SECRET
+        generateValue: true
+      - key: JWT_EXPIRES_IN
+        value: 24h
+      - key: JWT_REFRESH_EXPIRES_IN
+        value: 7d
+      - key: LOG_LEVEL
+        value: info
+      - key: ENABLE_RATE_LIMITING
+        value: true
+      - key: ENABLE_REQUEST_LOGGING
+        value: true
+      - key: ENABLE_CORS_CREDENTIALS
+        value: true
+      - key: ENABLE_HELMET_SECURITY
+        value: true
+      - key: RATE_LIMIT_WINDOW_MS
+        value: 900000
+      - key: RATE_LIMIT_MAX_REQUESTS
+        value: 100
+      - key: UPLOAD_MAX_FILE_SIZE
+        value: 10485760
+      - key: HELMET_HSTS_MAX_AGE
+        value: 31536000
+      - key: HELMET_HSTS_INCLUDE_SUBDOMAINS
+        value: true
+      - key: DB_DIALECT
+        value: postgres
+      - key: DB_SSL
+        value: true
+    
+  # Frontend Web Service
+  - type: web
+    name: niemis-frontend
+    env: static
+    plan: starter
+    buildCommand: cd frontend && npm install && npm run build
+    staticPublishPath: frontend/build
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: GENERATE_SOURCEMAP
+        value: false
+    
+  # Database Service
+  - type: pserv
+    name: niemis-postgres
+    plan: starter
+    
+databases:
+  - name: niemis-postgres
+    plan: starter
