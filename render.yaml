@@ -46,18 +46,14 @@ services:
     env: static
     plan: starter
     buildCommand: cd frontend && npm install && npm run build
-    staticPublishPath: frontend/build
+    staticPublishPath: frontend/dist
     envVars:
       - key: NODE_ENV
         value: production
       - key: GENERATE_SOURCEMAP
         value: false
     
-  # Database Service
-  - type: pserv
-    name: niemis-postgres
-    plan: starter
-    
 databases:
   - name: niemis-postgres
-    plan: starter
+    databaseName: niemis
+    user: niemis_user
