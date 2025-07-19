@@ -1,0 +1,87 @@
+{
+  "name": "niemis-frontend",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "National Integrated Education Management Information System - Frontend",
+  "dependencies": {
+    "@emotion/react": "^11.11.1",
+    "@emotion/styled": "^11.11.0",
+    "@mui/icons-material": "^5.14.3",
+    "@mui/material": "^5.14.5",
+    "@mui/x-data-grid": "^6.11.2",
+    "@mui/x-date-pickers": "^6.11.2",
+    "@testing-library/jest-dom": "^5.17.0",
+    "@testing-library/react": "^13.4.0",
+    "@testing-library/user-event": "^14.4.3",
+    "axios": "^1.5.0",
+    "chart.js": "^4.3.3",
+    "date-fns": "^2.30.0",
+    "formik": "^2.4.3",
+    "react": "^18.2.0",
+    "react-chartjs-2": "^5.2.0",
+    "react-dom": "^18.2.0",
+    "react-hot-toast": "^2.4.1",
+    "react-query": "^3.39.3",
+    "react-router-dom": "^6.15.0",
+    "socket.io-client": "^4.7.4",
+    "yup": "^1.2.0"
+  },
+  "scripts": {
+    "start": "vite",
+    "dev": "vite",
+    "build": "vite build",
+    "build:prod": "NODE_ENV=production vite build",
+    "build:vercel": "NODE_ENV=production VITE_VERCEL_ENV=production vite build",
+    "build:analyze": "npm run build && npx vite-bundle-analyzer build/static/js/*.js",
+    "test": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "test:ci": "vitest run --reporter=verbose --coverage",
+    "preview": "vite preview",
+    "preview:prod": "vite preview --mode production",
+    "lint": "eslint src --ext .js,.jsx,.ts,.tsx",
+    "lint:fix": "eslint src --ext .js,.jsx,.ts,.tsx --fix",
+    "format": "prettier --write src/**/*.{js,jsx,ts,tsx,json,css,md}",
+    "format:check": "prettier --check src/**/*.{js,jsx,ts,tsx,json,css,md}",
+    "type-check": "tsc --noEmit",
+    "clean": "rm -rf build node_modules/.vite",
+    "deploy:render": "npm run build:prod && echo 'Build ready for Render.com deployment'",
+    "deploy:vercel": "npm run build:vercel && echo 'Build ready for Vercel deployment'",
+    "health-check": "curl -f http://localhost:3000 || exit 1",
+    "vercel-build": "npm run build:vercel"
+  },
+  "eslintConfig": {
+    "extends": [
+      "react-app",
+      "react-app/jest"
+    ]
+  },
+  "browserslist": {
+    "production": [
+      ">0.2%",
+      "not dead",
+      "not op_mini all"
+    ],
+    "development": [
+      "last 1 chrome version",
+      "last 1 firefox version",
+      "last 1 safari version"
+    ]
+  },
+  "devDependencies": {
+    "@testing-library/jest-dom": "^5.17.0",
+    "@testing-library/react": "^13.4.0",
+    "@testing-library/user-event": "^14.4.3",
+    "@vitejs/plugin-react": "^4.6.0",
+    "@vitest/ui": "^1.6.1",
+    "eslint": "^8.57.1",
+    "eslint-plugin-react": "^7.37.5",
+    "eslint-plugin-react-hooks": "^4.6.2",
+    "prettier": "^3.6.2",
+    "typescript": "^5.8.3",
+    "vercel": "^44.4.1",
+    "vite": "^5.4.19",
+    "vite-bundle-analyzer": "^0.7.0",
+    "vitest": "^1.6.1"
+  }
+}

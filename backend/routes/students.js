@@ -1,5 +1,6 @@
 const express = require('express');
 const { body, validationResult, query } = require('express-validator');
+const { Op } = require('sequelize');
 const { 
     Student, 
     School, 

@@ -1,4 +1,5 @@
 const express = require('express');
+const { Op } = require('sequelize');
 const { Student, Staff, School, AttendanceRecord, AcademicRecord } = require('../models');
 const { requireRole } = require('../middleware/auth');
 

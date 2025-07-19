@@ -47,7 +47,7 @@ async function createDemoStudents() {
                     address: '123 Main Street, St. Peter, Barbados',
                     phone: '246-555-0001',
                     email: 'alex.student1@student.gov.bb',
-                    grade_level: '4th Form',
+                    grade_level: 'Fourth Form',
                     class_section: 'A',
                     enrollment_date: '2023-09-01'
                 }
@@ -70,7 +70,7 @@ async function createDemoStudents() {
                     address: '456 Oak Avenue, St. Peter, Barbados',
                     phone: '246-555-0002',
                     email: 'alex.student2@student.gov.bb',
-                    grade_level: '5th Form',
+                    grade_level: 'Fifth Form',
                     class_section: 'B',
                     enrollment_date: '2022-09-01'
                 }
@@ -93,7 +93,7 @@ async function createDemoStudents() {
                     address: '789 Cedar Road, St. Andrew, Barbados',
                     phone: '246-555-0003',
                     email: 'alleyne.student1@student.gov.bb',
-                    grade_level: '4th Form',
+                    grade_level: 'Fourth Form',
                     class_section: 'A',
                     enrollment_date: '2023-09-01'
                 }
@@ -116,7 +116,7 @@ async function createDemoStudents() {
                     address: '321 Pine Lane, St. Andrew, Barbados',
                     phone: '246-555-0004',
                     email: 'alleyne.student2@student.gov.bb',
-                    grade_level: '5th Form',
+                    grade_level: 'Fifth Form',
                     class_section: 'C',
                     enrollment_date: '2022-09-01'
                 }

@@ -113,7 +113,7 @@ class DemoStudentCreator {
      */
     async createStudentsForSchools(schools, transaction) {
         const studentsPerSchool = 5;
-        const gradelevels = ['Form 1', 'Form 2', 'Form 3', 'Form 4', 'Form 5', 'Form 6L', 'Form 6U'];
+        const gradelevels = ['First Form', 'Second Form', 'Third Form', 'Fourth Form', 'Fifth Form', 'Sixth Form', 'Upper Sixth'];
         
         for (const school of schools) {
             logger.info(`Creating demo students for ${school.name}...`);
