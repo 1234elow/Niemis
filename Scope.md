@@ -266,3 +266,8 @@ VITE_APP_NAME=NiEMIS
 - **5 geographic zones**: Performance tracking by regional areas
 - **SPIS compliance**: Student profiles follow Caribbean education standards
 - **RFID integration**: Real hardware integration for attendance tracking
+
+## Project Memories and Insights
+
+- yes we need role base access its important
+- Workflow recap: we have set up a comprehensive education management system with robust role-based access control, ensuring that each user type (student, teacher, admin, parent) sees only the data relevant to their role

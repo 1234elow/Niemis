@@ -46,9 +46,9 @@ module.exports = (sequelize, DataTypes) => {
             }
         },
         grade_value: {
-            type: DataTypes.ENUM('E', 'G', 'S', 'N'),
+            type: DataTypes.ENUM('A+', 'A', 'A-', 'B+', 'B', 'B-', 'C+', 'C', 'C-', 'D+', 'D', 'D-', 'F'),
             allowNull: false,
-            comment: 'E=Excellent, G=Good, S=Satisfactory, N=Needs Improvement'
+            comment: 'Standard A-F grading scale with plus/minus modifiers'
         },
         numeric_score: {
             type: DataTypes.DECIMAL(5, 2),
@@ -58,11 +58,11 @@ module.exports = (sequelize, DataTypes) => {
             }
         },
         effort_grade: {
-            type: DataTypes.ENUM('E', 'G', 'S', 'N'),
+            type: DataTypes.ENUM('A+', 'A', 'A-', 'B+', 'B', 'B-', 'C+', 'C', 'C-', 'D+', 'D', 'D-', 'F'),
             allowNull: false
         },
         behavior_grade: {
-            type: DataTypes.ENUM('E', 'G', 'S', 'N'),
+            type: DataTypes.ENUM('A+', 'A', 'A-', 'B+', 'B', 'B-', 'C+', 'C', 'C-', 'D+', 'D', 'D-', 'F'),
             allowNull: false
         },
         teacher_comments: {
