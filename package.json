@@ -1,0 +1,53 @@
+{
+  "name": "niemis-system",
+  "version": "1.0.0",
+  "description": "National Integrated Education Management Information System",
+  "main": "index.js",
+  "scripts": {
+    "dev": "node local-deployment/local-development.js dev",
+    "setup": "node local-deployment/local-development.js setup",
+    "start": "node local-deployment/local-development.js start",
+    "stop": "node local-deployment/local-development.js stop",
+    "health": "node local-deployment/local-development.js health",
+    "dev:backend": "cd backend && npm run dev",
+    "dev:frontend": "cd frontend && npm run dev",
+    "start:production": "NODE_ENV=production npm run start",
+    "install:all": "npm install && cd backend && npm install && cd ../frontend && npm install",
+    "clean": "rm -rf node_modules backend/node_modules frontend/node_modules",
+    "setup:db": "cd backend && npm run db:setup",
+    "db:migrate": "cd backend && npm run migrate",
+    "db:seed": "cd backend && npm run seed:production",
+    "db:reset": "cd backend && npm run db:reset",
+    "db:backup": "cd backend && npm run backup",
+    "db:restore": "cd backend && npm run restore",
+    "test:backend": "cd backend && npm run test",
+    "test:frontend": "cd frontend && npm run test",
+    "test:all": "npm run test:backend && npm run test:frontend",
+    "build": "cd frontend && npm run build",
+    "build:production": "NODE_ENV=production npm run build",
+    "format": "cd backend && npm run format && cd ../frontend && npm run format",
+    "lint": "cd backend && npm run lint && cd ../frontend && npm run lint",
+    "pre-commit": "npm run format && npm run lint && npm run test:all",
+    "docker:local": "docker-compose -f local-deployment/docker-compose.local.yml up -d",
+    "docker:stop": "docker-compose -f local-deployment/docker-compose.local.yml down",
+    "docker:rebuild": "docker-compose -f local-deployment/docker-compose.local.yml up -d --build",
+    "ssl:setup": "cd local-deployment && ./local-ssl-setup.sh",
+    "test:connection": "cd backend && node test-connection.js"
+  },
+  "keywords": [
+    "education",
+    "management",
+    "barbados",
+    "emis",
+    "school",
+    "students",
+    "teachers",
+    "administration"
+  ],
+  "author": "Ministry of Educational Transformation - Barbados",
+  "license": "MIT",
+  "devDependencies": {
+    "concurrently": "^8.2.2",
+    "kill-port": "^2.0.1"
+  }
+}

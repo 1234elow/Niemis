@@ -46,89 +46,12 @@ import {
 } from "@mui/icons-material";
 import { toast } from "react-hot-toast";
 import { apiService } from "../services/apiService";
-
-const STANDARD_GRADES = {
-  "A+": {
-    label: "A Plus",
-    color: "success",
-    description: "97-100%",
-    fullDescription: "Exceptional performance exceeding all expectations",
-  },
-  A: {
-    label: "A",
-    color: "success",
-    description: "93-96%",
-    fullDescription:
-      "Outstanding performance demonstrating mastery of all concepts",
-  },
-  "A-": {
-    label: "A Minus",
-    color: "success",
-    description: "90-92%",
-    fullDescription: "Excellent performance with minor areas for refinement",
-  },
-  "B+": {
-    label: "B Plus",
-    color: "info",
-    description: "87-89%",
-    fullDescription: "Very good performance showing strong understanding",
-  },
-  B: {
-    label: "B",
-    color: "info",
-    description: "83-86%",
-    fullDescription: "Good performance with solid grasp of concepts",
-  },
-  "B-": {
-    label: "B Minus",
-    color: "info",
-    description: "80-82%",
-    fullDescription: "Above average performance with room for improvement",
-  },
-  "C+": {
-    label: "C Plus",
-    color: "warning",
-    description: "77-79%",
-    fullDescription: "Satisfactory performance meeting most requirements",
-  },
-  C: {
-    label: "C",
-    color: "warning",
-    description: "73-76%",
-    fullDescription: "Average performance meeting basic requirements",
-  },
-  "C-": {
-    label: "C Minus",
-    color: "warning",
-    description: "70-72%",
-    fullDescription: "Below average but acceptable performance",
-  },
-  "D+": {
-    label: "D Plus",
-    color: "error",
-    description: "67-69%",
-    fullDescription: "Poor performance requiring additional support",
-  },
-  D: {
-    label: "D",
-    color: "error",
-    description: "65-66%",
-    fullDescription: "Minimal passing performance with significant gaps",
-  },
-  "D-": {
-    label: "D Minus",
-    color: "error",
-    description: "60-64%",
-    fullDescription:
-      "Barely passing performance needing immediate intervention",
-  },
-  F: {
-    label: "F",
-    color: "error",
-    description: "0-59%",
-    fullDescription: "Failing performance requiring comprehensive remediation",
-  },
-};
+import {
+  CARIBBEAN_GRADE_LOOKUP,
+  CARIBBEAN_GRADE_SCALE,
+  getCaribbeanGradeColor,
+  getCaribbeanGradeFromScore,
+} from "../constants/caribbeanGradeScale";
 
 const GradeViewingModal = ({ open, onClose, classData }) => {
   const [loading, setLoading] = useState(false);
@@ -186,13 +109,13 @@ const GradeViewingModal = ({ open, onClose, classData }) => {
   };
 
   const getGradeColor = (gradeValue) => {
-    return STANDARD_GRADES[gradeValue]?.color || "default";
+    return getCaribbeanGradeColor(gradeValue);
   };
 
   const getGradeTooltip = (gradeValue) => {
-    const grade = STANDARD_GRADES[gradeValue];
+    const grade = CARIBBEAN_GRADE_LOOKUP[gradeValue];
     if (!grade) return "";
-    return `${grade.label} (${grade.description}): ${grade.fullDescription}`;
+    return `${grade.letter} (${grade.min}-${grade.max}%): ${grade.fullDescription}`;
   };
 
   const calculateStudentAverage = (grades) => {
@@ -203,20 +126,15 @@ const GradeViewingModal = ({ open, onClose, classData }) => {
     );
     const average = sum / grades.length;
 
-    // Convert to standard A-F grade
-    if (average >= 97) return { numeric: average, letter: "A+" };
-    if (average >= 93) return { numeric: average, letter: "A" };
-    if (average >= 90) return { numeric: average, letter: "A-" };
-    if (average >= 87) return { numeric: average, letter: "B+" };
-    if (average >= 83) return { numeric: average, letter: "B" };
-    if (average >= 80) return { numeric: average, letter: "B-" };
-    if (average >= 77) return { numeric: average, letter: "C+" };
-    if (average >= 73) return { numeric: average, letter: "C" };
-    if (average >= 70) return { numeric: average, letter: "C-" };
-    if (average >= 67) return { numeric: average, letter: "D+" };
-    if (average >= 65) return { numeric: average, letter: "D" };
-    if (average >= 60) return { numeric: average, letter: "D-" };
-    return { numeric: average, letter: "F" };
+    return { numeric: average, letter: getCaribbeanGradeFromScore(average) };
+  };
+
+  const resolveAcademicGrade = (gradeRow) => {
+    const numericScore = Number(gradeRow?.numeric_score);
+    if (Number.isFinite(numericScore)) {
+      return getCaribbeanGradeFromScore(numericScore);
+    }
+    return gradeRow?.grade_value || "";
   };
 
   if (!gradesData && !loading) {
@@ -318,8 +236,16 @@ const GradeViewingModal = ({ open, onClose, classData }) => {
               </CardContent>
             </Card>
 
-            {/* Standard A-F Grading Scale Explanation */}
-            <Card sx={{ mb: 3, bgcolor: "background.paper" }}>
+            {/* Caribbean grading scale */}
+            <Card
+              sx={{
+                mb: 3,
+                background:
+                  "linear-gradient(180deg, rgba(18,117,125,0.08) 0%, rgba(18,117,125,0.02) 100%)",
+                border: "1px solid",
+                borderColor: "divider",
+              }}
+            >
               <CardContent>
                 <Typography
                   variant="h6"
@@ -327,42 +253,47 @@ const GradeViewingModal = ({ open, onClose, classData }) => {
                   sx={{ display: "flex", alignItems: "center", gap: 1 }}
                 >
                   <School />
-                  Standard A-F Grading Scale
+                  Caribbean A-F Grade Bands
                 </Typography>
                 <Typography
                   variant="body2"
                   color="text.secondary"
                   sx={{ mb: 2 }}
                 >
-                  Understanding the letter grades with plus/minus modifiers:
+                  NIEMIS now applies a Caribbean scale where D-bands are below
+                  50%.
                 </Typography>
                 <Grid container spacing={1}>
-                  {Object.entries(STANDARD_GRADES).map(([letter, info]) => (
-                    <Grid item xs={6} sm={4} md={3} lg={2} key={letter}>
+                  {CARIBBEAN_GRADE_SCALE.map((info) => (
+                    <Grid item xs={6} sm={4} md={3} lg={2} key={info.letter}>
                       <Box
                         sx={{
                           p: 1.5,
                           border: 1,
                           borderColor: "divider",
                           borderRadius: 1,
-                          textAlign: "center",
+                          textAlign: "left",
                           height: "100%",
                           display: "flex",
                           flexDirection: "column",
-                          gap: 0.5,
+                          gap: 0.75,
+                          backgroundColor: "background.paper",
                         }}
                       >
                         <Chip
-                          label={letter}
+                          label={info.letter}
                           color={info.color}
                           size="small"
-                          sx={{ fontWeight: "bold", fontSize: "0.9rem" }}
+                          sx={{ fontWeight: "bold", fontSize: "0.9rem", width: "fit-content" }}
                         />
                         <Typography variant="caption" fontWeight="medium">
                           {info.label}
                         </Typography>
                         <Typography variant="caption" color="primary">
-                          {info.description}
+                          {info.min}% - {info.max}%
+                        </Typography>
+                        <Typography variant="caption" color="text.secondary">
+                          {info.fullDescription}
                         </Typography>
                       </Box>
                     </Grid>
@@ -370,11 +301,8 @@ const GradeViewingModal = ({ open, onClose, classData }) => {
                 </Grid>
                 <Alert severity="info" sx={{ mt: 2 }}>
                   <Typography variant="body2">
-                    <strong>Note:</strong> This standard A-F grading scale
-                    includes plus (+) and minus (-) modifiers for more precise
-                    evaluation. Grades below D- (60%) indicate failing
-                    performance requiring immediate intervention and
-                    remediation.
+                    <strong>Note:</strong> C- starts at 50%. D+, D, and D- are
+                    all below 50%, and F remains below 40%.
                   </Typography>
                 </Alert>
               </CardContent>
@@ -451,6 +379,9 @@ const GradeViewingModal = ({ open, onClose, classData }) => {
                       const { student, grades } = studentData;
                       const average = calculateStudentAverage(grades);
                       const recentGrade = grades[0]; // Grades are ordered by date_entered DESC
+                      const recentLetter = recentGrade
+                        ? resolveAcademicGrade(recentGrade)
+                        : "";
 
                       return (
                         <React.Fragment key={student.id}>
@@ -527,16 +458,12 @@ const GradeViewingModal = ({ open, onClose, classData }) => {
                               {recentGrade ? (
                                 <Box>
                                   <Tooltip
-                                    title={getGradeTooltip(
-                                      recentGrade.grade_value,
-                                    )}
+                                    title={getGradeTooltip(recentLetter)}
                                     arrow
                                   >
                                     <Chip
-                                      label={`${recentGrade.grade_value} (${recentGrade.numeric_score}%)`}
-                                      color={getGradeColor(
-                                        recentGrade.grade_value,
-                                      )}
+                                      label={`${recentLetter} (${recentGrade.numeric_score}%)`}
+                                      color={getGradeColor(recentLetter)}
                                       size="small"
                                     />
                                   </Tooltip>
@@ -596,104 +523,107 @@ const GradeViewingModal = ({ open, onClose, classData }) => {
                                         </TableRow>
                                       </TableHead>
                                       <TableBody>
-                                        {grades.map((grade) => (
-                                          <TableRow key={grade.id}>
-                                            <TableCell>
-                                              <Chip
-                                                label={
-                                                  grade.subject?.code || "N/A"
-                                                }
-                                                size="small"
-                                                variant="outlined"
-                                              />
-                                            </TableCell>
-                                            <TableCell>
-                                              <Box>
-                                                <Typography
-                                                  variant="body2"
-                                                  fontWeight="medium"
-                                                >
-                                                  {grade.assessment_components
-                                                    ?.assessment_name || "N/A"}
-                                                </Typography>
-                                                <Typography
-                                                  variant="caption"
-                                                  color="text.secondary"
-                                                >
-                                                  {grade.assessment_components
-                                                    ?.assessment_type || ""}
-                                                </Typography>
-                                              </Box>
-                                            </TableCell>
-                                            <TableCell>
-                                              <Tooltip
-                                                title={getGradeTooltip(
-                                                  grade.grade_value,
-                                                )}
-                                                arrow
-                                              >
+                                        {grades.map((grade) => {
+                                          const academicLetter = resolveAcademicGrade(grade);
+                                          return (
+                                            <TableRow key={grade.id}>
+                                              <TableCell>
                                                 <Chip
-                                                  label={grade.grade_value}
-                                                  color={getGradeColor(
-                                                    grade.grade_value,
-                                                  )}
+                                                  label={
+                                                    grade.subject?.code || "N/A"
+                                                  }
                                                   size="small"
+                                                  variant="outlined"
                                                 />
-                                              </Tooltip>
-                                            </TableCell>
-                                            <TableCell>
-                                              {grade.numeric_score}%
-                                            </TableCell>
-                                            <TableCell>
-                                              <Tooltip
-                                                title={getGradeTooltip(
-                                                  grade.effort_grade,
-                                                )}
-                                                arrow
-                                              >
-                                                <Chip
-                                                  label={grade.effort_grade}
-                                                  color={getGradeColor(
+                                              </TableCell>
+                                              <TableCell>
+                                                <Box>
+                                                  <Typography
+                                                    variant="body2"
+                                                    fontWeight="medium"
+                                                  >
+                                                    {grade.assessment_components
+                                                      ?.assessment_name || "N/A"}
+                                                  </Typography>
+                                                  <Typography
+                                                    variant="caption"
+                                                    color="text.secondary"
+                                                  >
+                                                    {grade.assessment_components
+                                                      ?.assessment_type || ""}
+                                                  </Typography>
+                                                </Box>
+                                              </TableCell>
+                                              <TableCell>
+                                                <Tooltip
+                                                  title={getGradeTooltip(
+                                                    academicLetter,
+                                                  )}
+                                                  arrow
+                                                >
+                                                  <Chip
+                                                    label={academicLetter}
+                                                    color={getGradeColor(
+                                                      academicLetter,
+                                                    )}
+                                                    size="small"
+                                                  />
+                                                </Tooltip>
+                                              </TableCell>
+                                              <TableCell>
+                                                {grade.numeric_score}%
+                                              </TableCell>
+                                              <TableCell>
+                                                <Tooltip
+                                                  title={getGradeTooltip(
                                                     grade.effort_grade,
                                                   )}
-                                                  size="small"
-                                                  variant="outlined"
-                                                />
-                                              </Tooltip>
-                                            </TableCell>
-                                            <TableCell>
-                                              <Tooltip
-                                                title={getGradeTooltip(
-                                                  grade.behavior_grade,
-                                                )}
-                                                arrow
-                                              >
-                                                <Chip
-                                                  label={grade.behavior_grade}
-                                                  color={getGradeColor(
+                                                  arrow
+                                                >
+                                                  <Chip
+                                                    label={grade.effort_grade}
+                                                    color={getGradeColor(
+                                                      grade.effort_grade,
+                                                    )}
+                                                    size="small"
+                                                    variant="outlined"
+                                                  />
+                                                </Tooltip>
+                                              </TableCell>
+                                              <TableCell>
+                                                <Tooltip
+                                                  title={getGradeTooltip(
                                                     grade.behavior_grade,
                                                   )}
-                                                  size="small"
-                                                  variant="outlined"
-                                                />
-                                              </Tooltip>
-                                            </TableCell>
-                                            <TableCell>
-                                              <Typography variant="body2">
-                                                {formatDate(grade.date_entered)}
-                                              </Typography>
-                                            </TableCell>
-                                            <TableCell>
-                                              <Typography
-                                                variant="body2"
-                                                sx={{ maxWidth: 200 }}
-                                              >
-                                                {grade.teacher_comments ||
+                                                  arrow
+                                                >
+                                                  <Chip
+                                                    label={grade.behavior_grade}
+                                                    color={getGradeColor(
+                                                      grade.behavior_grade,
+                                                    )}
+                                                    size="small"
+                                                    variant="outlined"
+                                                  />
+                                                </Tooltip>
+                                              </TableCell>
+                                              <TableCell>
+                                                <Typography variant="body2">
+                                                  {formatDate(grade.date_entered)}
+                                                </Typography>
+                                              </TableCell>
+                                              <TableCell>
+                                                <Typography
+                                                  variant="body2"
+                                                  sx={{ maxWidth: 200 }}
+                                                >
+                                                  {grade.teacher_comments ||
                                                   "No comments"}
-                                              </Typography>
-                                            </TableCell>
-                                          </TableRow>
-                                        ))}
+                                                </Typography>
+                                              </TableCell>
+                                            </TableRow>
+                                          );
+                                        })}
                                       </TableBody>
                                     </Table>
                                   ) : (

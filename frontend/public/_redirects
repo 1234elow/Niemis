@@ -1,0 +1,19 @@
+# NiEMIS Frontend - URL Redirects for SPA
+# This file handles client-side routing redirects
+
+# Redirect all requests to index.html for SPA routing
+/*    /index.html   200
+
+# API proxy redirects (fallback)
+/api/*  https://niemis-backend.onrender.com/api/:splat  200
+
+# Legacy URL redirects
+/dashboard  /  301
+/login.html  /login  301
+/admin  /  301
+
+# Force HTTPS redirects
+http://niemis-frontend.onrender.com/*  https://niemis-frontend.onrender.com/:splat  301!
+
+# Health check endpoint
+/health  /index.html  200

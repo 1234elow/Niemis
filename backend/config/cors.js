@@ -146,6 +146,12 @@ class CORSManager {
                 return callback(null, true);
             }
 
+            // Emergency localhost fix for development
+            if (!isProduction && (origin === 'http://localhost:3000' || origin === 'http://127.0.0.1:3000')) {
+                logger.debug('CORS: Emergency localhost fix applied', { origin });
+                return callback(null, true);
+            }
+
             // Default: reject unknown origins
             this.logCORSViolation(origin, 'untrusted_origin', originURL);
             const error = new Error('Origin not allowed by CORS policy');
@@ -248,13 +254,13 @@ class CORSManager {
      * Get allowed HTTP methods
      */
     getAllowedMethods() {
-        const baseMethods = ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'HEAD'];
-        
-        // Add PATCH for partial updates (if needed)
-        if (process.env.CORS_ALLOW_PATCH === 'true') {
-            baseMethods.push('PATCH');
+        const baseMethods = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS', 'HEAD'];
+
+        // Keep PATCH enabled in development so admin workflow updates continue to work.
+        if (isProduction && process.env.CORS_ALLOW_PATCH === 'false') {
+            return baseMethods.filter((method) => method !== 'PATCH');
         }
-        
+
         return baseMethods;
     }
 

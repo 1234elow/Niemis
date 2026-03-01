@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NiEMIS Demo</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #2c3e50;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .api-test {
+            margin: 20px 0;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 5px;
+        }
+        button {
+            background: #3498db;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background: #2980b9;
+        }
+        .response {
+            background: #2c3e50;
+            color: #ecf0f1;
+            padding: 15px;
+            border-radius: 5px;
+            margin-top: 10px;
+            font-family: monospace;
+            white-space: pre-wrap;
+        }
+        .success {
+            background: #27ae60;
+            color: white;
+            padding: 10px;
+            border-radius: 5px;
+            margin: 10px 0;
+        }
+        .error {
+            background: #e74c3c;
+            color: white;
+            padding: 10px;
+            border-radius: 5px;
+            margin: 10px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎓 NiEMIS Demo</h1>
+        <p><strong>National Integrated Education Management Information System</strong></p>
+        <p>This is a demo of the NiEMIS backend API. The system manages 106 schools across Barbados with comprehensive student, teacher, and facility management.</p>
+        
+        <div class="api-test">
+            <h3>🔍 API Health Check</h3>
+            <button onclick="checkHealth()">Test Backend Health</button>
+            <div id="health-response"></div>
+        </div>
+        
+        <div class="api-test">
+            <h3>🔐 API Demo</h3>
+            <p>Test the NiEMIS API endpoints:</p>
+            <button onclick="testLogin()">Test Demo API</button>
+            <div id="login-response"></div>
+        </div>
+        
+        <div class="api-test">
+            <h3>📊 System Status</h3>
+            <div id="system-status">
+                <div class="success">✅ Backend Server: Running on port 5000</div>
+                <div class="success">✅ Database: Connected (SQLite)</div>
+                <div class="success">✅ API Health: OK</div>
+            </div>
+        </div>
+        
+        <div class="api-test">
+            <h3>📋 Available Endpoints</h3>
+            <ul>
+                <li><code>/api/auth</code> - Authentication (login, register)</li>
+                <li><code>/api/schools</code> - School management</li>
+                <li><code>/api/students</code> - Student profiles and SPIS data</li>
+                <li><code>/api/teachers</code> - Staff management</li>
+                <li><code>/api/attendance</code> - Attendance tracking</li>
+                <li><code>/api/facilities</code> - Facility management</li>
+                <li><code>/api/reports</code> - Reports and analytics</li>
+                <li><code>/api/rfid</code> - RFID device management</li>
+            </ul>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = 'http://localhost:5000';
+        
+        async function checkHealth() {
+            const responseDiv = document.getElementById('health-response');
+            responseDiv.innerHTML = '<div>Testing...</div>';
+            
+            try {
+                const response = await fetch(`${API_BASE}/health`);
+                const data = await response.json();
+                responseDiv.innerHTML = `
+                    <div class="success">✅ Backend is healthy!</div>
+                    <div class="response">${JSON.stringify(data, null, 2)}</div>
+                `;
+            } catch (error) {
+                responseDiv.innerHTML = `
+                    <div class="error">❌ Backend connection failed</div>
+                    <div class="response">${error.message}</div>
+                `;
+            }
+        }
+        
+        async function testLogin() {
+            const responseDiv = document.getElementById('login-response');
+            responseDiv.innerHTML = '<div>Testing demo endpoint...</div>';
+            
+            try {
+                // Test the demo endpoint we created
+                const response = await fetch(`${API_BASE}/api/demo`);
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    responseDiv.innerHTML = `
+                        <div class="success">✅ Demo endpoint working!</div>
+                        <div class="response">${JSON.stringify(data, null, 2)}</div>
+                    `;
+                } else {
+                    // Try basic auth endpoint structure
+                    const authResponse = await fetch(`${API_BASE}/api/auth/login`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            login: 'demo',
+                            password: 'demo'
+                        })
+                    });
+                    
+                    const authData = await authResponse.json();
+                    responseDiv.innerHTML = `
+                        <div class="error">⚠️ Auth endpoint available but needs valid credentials</div>
+                        <div class="response">${JSON.stringify(authData, null, 2)}</div>
+                    `;
+                }
+            } catch (error) {
+                responseDiv.innerHTML = `
+                    <div class="error">❌ API connection test failed</div>
+                    <div class="response">${error.message}</div>
+                `;
+            }
+        }
+        
+        // Auto-run health check on page load
+        window.onload = function() {
+            checkHealth();
+        };
+    </script>
+</body>
+</html>

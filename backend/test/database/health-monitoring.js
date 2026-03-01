@@ -217,8 +217,8 @@ class DatabaseHealthMonitor {
             {
                 name: 'zone_count',
                 test: () => sequelize.query('SELECT COUNT(*) as count FROM zones'),
-                expected: { exact: 5 },
-                description: 'Should have exactly 5 zones'
+                expected: { exact: 3 },
+                description: 'Should have exactly 3 zones'
             },
             {
                 name: 'parish_count',

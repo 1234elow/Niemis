@@ -1,0 +1,560 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>NiEMIS Command Center - Trends Tab</title>
+
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,100..1000;1,9..40,100..1000&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+
+  <style>
+    :root {
+      --cc-void: #060a13;
+      --cc-deep: #0a101f;
+      --cc-primary: #0f172a;
+      --cc-secondary: #1e293b;
+      --cc-glass: rgba(30, 41, 59, 0.75);
+      --cc-glass-border: rgba(148, 163, 184, 0.08);
+      --cc-glass-highlight: rgba(255, 255, 255, 0.03);
+      --cc-surface: rgba(255, 255, 255, 0.02);
+      --cc-text-primary: #f1f5f9;
+      --cc-text-secondary: #94a3b8;
+      --cc-text-muted: #64748b;
+      --cc-text-dim: #475569;
+      --cc-teal: #14b8a6;
+      --cc-teal-glow: rgba(20, 184, 166, 0.15);
+      --cc-blue: #3b82f6;
+      --cc-blue-glow: rgba(59, 130, 246, 0.15);
+      --cc-emerald: #10b981;
+      --cc-emerald-glow: rgba(16, 185, 129, 0.15);
+      --cc-amber: #f59e0b;
+      --cc-amber-glow: rgba(245, 158, 11, 0.12);
+      --cc-coral: #f43f5e;
+      --cc-coral-glow: rgba(244, 63, 94, 0.12);
+      --cc-purple: #a855f7;
+      --font-display: 'Space Mono', monospace;
+      --font-body: 'DM Sans', sans-serif;
+      --space-1: 4px;
+      --space-2: 8px;
+      --space-3: 12px;
+      --space-4: 16px;
+      --space-5: 20px;
+      --space-6: 24px;
+      --radius-sm: 6px;
+      --radius-md: 10px;
+      --radius-lg: 16px;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html { font-size: 16px; -webkit-font-smoothing: antialiased; }
+    body {
+      font-family: var(--font-body);
+      background: var(--cc-void);
+      color: var(--cc-text-primary);
+      line-height: 1.5;
+      min-height: 100vh;
+    }
+
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background:
+        radial-gradient(ellipse 80% 50% at 20% 40%, var(--cc-teal-glow) 0%, transparent 50%),
+        radial-gradient(ellipse 60% 40% at 80% 60%, var(--cc-blue-glow) 0%, transparent 40%),
+        linear-gradient(180deg, var(--cc-void) 0%, var(--cc-deep) 50%, var(--cc-primary) 100%);
+      pointer-events: none;
+      z-index: -1;
+    }
+
+    body::after {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
+      opacity: 0.03;
+      pointer-events: none;
+      z-index: 1000;
+    }
+
+    .dashboard { max-width: 1440px; margin: 0 auto; padding: var(--space-6); position: relative; z-index: 1; }
+
+    /* Compact Header */
+    .compact-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: var(--space-4) var(--space-5);
+      background: var(--cc-glass);
+      backdrop-filter: blur(20px);
+      border: 1px solid var(--cc-glass-border);
+      border-radius: var(--radius-lg);
+      margin-bottom: var(--space-5);
+    }
+
+    .header-left { display: flex; align-items: center; gap: var(--space-4); }
+
+    .logo-mark {
+      width: 40px;
+      height: 40px;
+      background: linear-gradient(135deg, var(--cc-teal) 0%, var(--cc-blue) 100%);
+      border-radius: var(--radius-sm);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: var(--font-display);
+      font-weight: 700;
+      font-size: 12px;
+      color: white;
+    }
+
+    .header-title { font-family: var(--font-display); font-size: 16px; font-weight: 700; }
+    .breadcrumb { display: flex; align-items: center; gap: var(--space-2); font-size: 12px; color: var(--cc-text-muted); }
+    .breadcrumb-current { color: var(--cc-teal); font-weight: 600; }
+
+    /* Tab Navigation */
+    .tab-navigation {
+      display: flex;
+      align-items: center;
+      gap: var(--space-1);
+      padding: var(--space-1);
+      background: var(--cc-surface);
+      border: 1px solid var(--cc-glass-border);
+      border-radius: var(--radius-md);
+      margin-bottom: var(--space-5);
+    }
+
+    .tab-btn {
+      display: flex;
+      align-items: center;
+      gap: var(--space-2);
+      padding: var(--space-3) var(--space-5);
+      background: transparent;
+      border: none;
+      border-radius: var(--radius-sm);
+      font-family: var(--font-body);
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--cc-text-secondary);
+      cursor: pointer;
+      transition: all 0.2s ease;
+      position: relative;
+    }
+
+    .tab-btn:hover { color: var(--cc-text-primary); background: var(--cc-glass-highlight); }
+    .tab-btn.active { background: var(--cc-teal-glow); color: var(--cc-teal); }
+    .tab-btn.active::after {
+      content: '';
+      position: absolute;
+      bottom: -1px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 24px;
+      height: 3px;
+      background: var(--cc-teal);
+      border-radius: 3px 3px 0 0;
+    }
+
+    .tab-badge {
+      min-width: 18px;
+      height: 18px;
+      padding: 0 6px;
+      background: var(--cc-coral);
+      color: white;
+      border-radius: 100px;
+      font-size: 10px;
+      font-weight: 700;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    /* Charts Grid */
+    .charts-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: var(--space-5);
+      animation: gridFade 0.5s ease-out;
+    }
+
+    @keyframes gridFade {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .chart-panel {
+      background: var(--cc-glass);
+      backdrop-filter: blur(16px);
+      border: 1px solid var(--cc-glass-border);
+      border-radius: var(--radius-lg);
+      padding: var(--space-6);
+      transition: all 0.25s ease;
+    }
+
+    .chart-panel:hover {
+      border-color: var(--cc-teal);
+      box-shadow: 0 0 40px -10px var(--cc-teal-glow);
+    }
+
+    .chart-header {
+      margin-bottom: var(--space-4);
+    }
+
+    .chart-title {
+      font-family: var(--font-display);
+      font-size: 14px;
+      font-weight: 700;
+      color: var(--cc-text-primary);
+      margin-bottom: var(--space-1);
+    }
+
+    .chart-subtitle {
+      font-size: 12px;
+      color: var(--cc-text-secondary);
+    }
+
+    /* SVG Chart */
+    .chart-container {
+      height: 220px;
+      position: relative;
+    }
+
+    .chart-svg {
+      width: 100%;
+      height: 100%;
+    }
+
+    .chart-grid line {
+      stroke: var(--cc-glass-border);
+      stroke-width: 1;
+    }
+
+    .chart-axis text {
+      fill: var(--cc-text-muted);
+      font-size: 10px;
+      font-family: var(--font-display);
+    }
+
+    .chart-area {
+      fill: url(#areaGradient);
+      opacity: 0.4;
+    }
+
+    .chart-line {
+      fill: none;
+      stroke-width: 2.5;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+
+    .chart-line.primary { stroke: var(--cc-emerald); }
+    .chart-line.secondary { stroke: var(--cc-amber); }
+    .chart-line.tertiary { stroke: var(--cc-coral); }
+
+    .chart-dot {
+      r: 4;
+      fill: var(--cc-primary);
+      stroke-width: 2;
+    }
+
+    .chart-dot.primary { stroke: var(--cc-emerald); }
+    .chart-dot.secondary { stroke: var(--cc-amber); }
+
+    /* Legend */
+    .chart-legend {
+      display: flex;
+      gap: var(--space-4);
+      margin-top: var(--space-4);
+      flex-wrap: wrap;
+    }
+
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: var(--space-2);
+      font-size: 11px;
+      color: var(--cc-text-secondary);
+    }
+
+    .legend-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+    }
+
+    .legend-dot.primary { background: var(--cc-emerald); }
+    .legend-dot.secondary { background: var(--cc-amber); }
+    .legend-dot.tertiary { background: var(--cc-coral); }
+    .legend-dot.blue { background: var(--cc-blue); }
+
+    /* Animated line drawing */
+    @keyframes drawLine {
+      from { stroke-dashoffset: 1000; }
+      to { stroke-dashoffset: 0; }
+    }
+
+    .chart-line {
+      stroke-dasharray: 1000;
+      stroke-dashoffset: 1000;
+      animation: drawLine 2s ease-out forwards;
+    }
+
+    .chart-line.secondary { animation-delay: 0.3s; }
+    .chart-line.tertiary { animation-delay: 0.6s; }
+
+    @keyframes fadeInDot {
+      from { opacity: 0; transform: scale(0); }
+      to { opacity: 1; transform: scale(1); }
+    }
+
+    .chart-dot {
+      opacity: 0;
+      animation: fadeInDot 0.3s ease-out forwards;
+    }
+
+    .chart-dot:nth-child(1) { animation-delay: 0.4s; }
+    .chart-dot:nth-child(2) { animation-delay: 0.6s; }
+    .chart-dot:nth-child(3) { animation-delay: 0.8s; }
+    .chart-dot:nth-child(4) { animation-delay: 1s; }
+    .chart-dot:nth-child(5) { animation-delay: 1.2s; }
+    .chart-dot:nth-child(6) { animation-delay: 1.4s; }
+    .chart-dot:nth-child(7) { animation-delay: 1.6s; }
+
+    @media (max-width: 1200px) {
+      .charts-grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <div class="dashboard">
+
+    <!-- Compact Header -->
+    <header class="compact-header">
+      <div class="header-left">
+        <div class="logo-mark">NI</div>
+        <div>
+          <div class="header-title">Command Center</div>
+          <div class="breadcrumb">
+            <span>Dashboard</span>
+            <span>/</span>
+            <span class="breadcrumb-current">Trends</span>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <!-- Tab Navigation -->
+    <nav class="tab-navigation">
+      <button class="tab-btn">Operations</button>
+      <button class="tab-btn">
+        Data Quality
+        <span class="tab-badge">3</span>
+      </button>
+      <button class="tab-btn active">Trends</button>
+      <button class="tab-btn">Readiness</button>
+      <button class="tab-btn">Audit</button>
+    </nav>
+
+    <!-- Charts Grid -->
+    <div class="charts-grid">
+
+      <!-- Attendance Trend -->
+      <div class="chart-panel">
+        <div class="chart-header">
+          <h3 class="chart-title">Attendance Trend (7d)</h3>
+          <p class="chart-subtitle">Daily attendance percentage for the most recent week</p>
+        </div>
+        <div class="chart-container">
+          <svg class="chart-svg" viewBox="0 0 300 180">
+            <defs>
+              <linearGradient id="areaGradient1" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stop-color="#10b981" stop-opacity="0.3"/>
+                <stop offset="100%" stop-color="#10b981" stop-opacity="0"/>
+              </linearGradient>
+            </defs>
+
+            <!-- Grid lines -->
+            <g class="chart-grid">
+              <line x1="40" y1="20" x2="290" y2="20"/>
+              <line x1="40" y1="60" x2="290" y2="60"/>
+              <line x1="40" y1="100" x2="290" y2="100"/>
+              <line x1="40" y1="140" x2="290" y2="140"/>
+            </g>
+
+            <!-- Y Axis Labels -->
+            <g class="chart-axis">
+              <text x="35" y="24" text-anchor="end">100%</text>
+              <text x="35" y="64" text-anchor="end">90%</text>
+              <text x="35" y="104" text-anchor="end">80%</text>
+              <text x="35" y="144" text-anchor="end">70%</text>
+            </g>
+
+            <!-- X Axis Labels -->
+            <g class="chart-axis">
+              <text x="55" y="165">Mon</text>
+              <text x="95" y="165">Tue</text>
+              <text x="135" y="165">Wed</text>
+              <text x="175" y="165">Thu</text>
+              <text x="215" y="165">Fri</text>
+              <text x="255" y="165">Sat</text>
+            </g>
+
+            <!-- Area Fill -->
+            <path class="chart-area" fill="url(#areaGradient1)"
+              d="M55,55 L95,40 L135,50 L175,35 L215,45 L255,30 L255,140 L55,140 Z"/>
+
+            <!-- Line -->
+            <path class="chart-line primary"
+              d="M55,55 L95,40 L135,50 L175,35 L215,45 L255,30"/>
+
+            <!-- Dots -->
+            <circle class="chart-dot primary" cx="55" cy="55"/>
+            <circle class="chart-dot primary" cx="95" cy="40"/>
+            <circle class="chart-dot primary" cx="135" cy="50"/>
+            <circle class="chart-dot primary" cx="175" cy="35"/>
+            <circle class="chart-dot primary" cx="215" cy="45"/>
+            <circle class="chart-dot primary" cx="255" cy="30"/>
+          </svg>
+        </div>
+        <div class="chart-legend">
+          <div class="legend-item">
+            <span class="legend-dot primary"></span>
+            Attendance Rate (%)
+          </div>
+        </div>
+      </div>
+
+      <!-- Enrollment Trend -->
+      <div class="chart-panel">
+        <div class="chart-header">
+          <h3 class="chart-title">Enrollment Trend (30d)</h3>
+          <p class="chart-subtitle">Daily new admissions and rolling cumulative growth</p>
+        </div>
+        <div class="chart-container">
+          <svg class="chart-svg" viewBox="0 0 300 180">
+            <defs>
+              <linearGradient id="areaGradient2" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stop-color="#3b82f6" stop-opacity="0.3"/>
+                <stop offset="100%" stop-color="#3b82f6" stop-opacity="0"/>
+              </linearGradient>
+            </defs>
+
+            <!-- Grid lines -->
+            <g class="chart-grid">
+              <line x1="40" y1="20" x2="290" y2="20"/>
+              <line x1="40" y1="60" x2="290" y2="60"/>
+              <line x1="40" y1="100" x2="290" y2="100"/>
+              <line x1="40" y1="140" x2="290" y2="140"/>
+            </g>
+
+            <!-- Y Axis Labels -->
+            <g class="chart-axis">
+              <text x="35" y="24" text-anchor="end">200</text>
+              <text x="35" y="64" text-anchor="end">150</text>
+              <text x="35" y="104" text-anchor="end">100</text>
+              <text x="35" y="144" text-anchor="end">50</text>
+            </g>
+
+            <!-- X Axis Labels -->
+            <g class="chart-axis">
+              <text x="55" y="165">W1</text>
+              <text x="115" y="165">W2</text>
+              <text x="175" y="165">W3</text>
+              <text x="235" y="165">W4</text>
+            </g>
+
+            <!-- Area Fill -->
+            <path class="chart-area" fill="url(#areaGradient2)"
+              d="M55,120 L95,100 L135,110 L175,85 L215,75 L255,60 L255,140 L55,140 Z"/>
+
+            <!-- Lines -->
+            <path class="chart-line" style="stroke: var(--cc-blue);"
+              d="M55,120 L95,100 L135,110 L175,85 L215,75 L255,60"/>
+
+            <path class="chart-line secondary"
+              d="M55,130 L95,115 L135,100 L175,80 L215,55 L255,30"/>
+          </svg>
+        </div>
+        <div class="chart-legend">
+          <div class="legend-item">
+            <span class="legend-dot blue"></span>
+            New Students
+          </div>
+          <div class="legend-item">
+            <span class="legend-dot secondary"></span>
+            30-Day Cumulative
+          </div>
+        </div>
+      </div>
+
+      <!-- Transfer Trend -->
+      <div class="chart-panel">
+        <div class="chart-header">
+          <h3 class="chart-title">Transfer Trend (30d)</h3>
+          <p class="chart-subtitle">Daily transfer volume with pending queue visibility</p>
+        </div>
+        <div class="chart-container">
+          <svg class="chart-svg" viewBox="0 0 300 180">
+            <defs>
+              <linearGradient id="areaGradient3" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stop-color="#3b82f6" stop-opacity="0.3"/>
+                <stop offset="100%" stop-color="#3b82f6" stop-opacity="0"/>
+              </linearGradient>
+            </defs>
+
+            <!-- Grid lines -->
+            <g class="chart-grid">
+              <line x1="40" y1="20" x2="290" y2="20"/>
+              <line x1="40" y1="60" x2="290" y2="60"/>
+              <line x1="40" y1="100" x2="290" y2="100"/>
+              <line x1="40" y1="140" x2="290" y2="140"/>
+            </g>
+
+            <!-- Y Axis Labels -->
+            <g class="chart-axis">
+              <text x="35" y="24" text-anchor="end">50</text>
+              <text x="35" y="64" text-anchor="end">40</text>
+              <text x="35" y="104" text-anchor="end">30</text>
+              <text x="35" y="144" text-anchor="end">20</text>
+            </g>
+
+            <!-- X Axis Labels -->
+            <g class="chart-axis">
+              <text x="55" y="165">W1</text>
+              <text x="115" y="165">W2</text>
+              <text x="175" y="165">W3</text>
+              <text x="235" y="165">W4</text>
+            </g>
+
+            <!-- Area Fill -->
+            <path class="chart-area" fill="url(#areaGradient3)"
+              d="M55,100 L95,80 L135,90 L175,70 L215,60 L255,50 L255,140 L55,140 Z"/>
+
+            <!-- Lines -->
+            <path class="chart-line" style="stroke: var(--cc-blue);"
+              d="M55,100 L95,80 L135,90 L175,70 L215,60 L255,50"/>
+
+            <path class="chart-line tertiary"
+              d="M55,120 L95,130 L135,115 L175,125 L215,110 L255,120"/>
+          </svg>
+        </div>
+        <div class="chart-legend">
+          <div class="legend-item">
+            <span class="legend-dot blue"></span>
+            Total Transfers
+          </div>
+          <div class="legend-item">
+            <span class="legend-dot tertiary"></span>
+            Pending Transfers
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+  </div>
+</body>
+</html>

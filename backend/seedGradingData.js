@@ -347,40 +347,6 @@ async function createStudentsWithProfiles(studentsData, schoolId, classId, grade
     }
 }
 
-async function createTeacher(schoolId, firstName, lastName, email) {
-    const username = `${firstName.toLowerCase().replace(/[^a-z0-9]/g, '')}${lastName.toLowerCase().replace(/[^a-z0-9]/g, '')}`;
-    
-    const [teacherUser] = await User.findOrCreate({
-        where: { email },
-        defaults: {
-            username,
-            email,
-            password_hash: await bcrypt.hash('teacher123', 12),
-            role: 'teacher'
-        }
-    });
-
-    const [teacher] = await Staff.findOrCreate({
-        where: { user_id: teacherUser.id },
-        defaults: {
-            user_id: teacherUser.id,
-            school_id: schoolId,
-            first_name: firstName,
-            last_name: lastName,
-            email,
-            phone: '246-234-5678',
-            position: 'Teacher',
-            department: 'Primary',
-            qualification: 'Bachelor of Education',
-            hire_date: '2020-09-01',
-            employee_id: `TCHR${Date.now()}`,
-            is_active: true
-        }
-    });
-
-    return teacher;
-}
-
 async function createParentsForStudent(student, studentData, index) {
     const motherOccupation = sampleData.parentOccupations[index % sampleData.parentOccupations.length];
     const fatherOccupation = sampleData.parentOccupations[(index + 1) % sampleData.parentOccupations.length];

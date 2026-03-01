@@ -217,7 +217,7 @@ class DeploymentValidator {
             
             // Expected data counts
             const expectedSchools = 106;
-            const expectedZones = 5;
+            const expectedZones = 3;
             const expectedParishes = 11;
             
             const schoolDataValid = schoolCount >= 100; // Allow some tolerance

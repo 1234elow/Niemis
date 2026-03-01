@@ -12,13 +12,15 @@ if (process.env.NODE_ENV === 'production' || process.env.DB_HOST || process.env.
         // Use connection URL if provided (Render.com format)
         sequelize = new Sequelize(databaseUrl, {
             dialect: 'postgres',
+            schema: 'school_system',
             logging: process.env.NODE_ENV === 'development' ? console.log : false,
             define: {
                 underscored: true,
                 freezeTableName: true,
                 timestamps: true,
                 createdAt: 'created_at',
-                updatedAt: 'updated_at'
+                updatedAt: 'updated_at',
+                schema: 'school_system'
             },
             pool: {
                 max: parseInt(process.env.DB_POOL_MAX) || 10,
@@ -77,13 +79,15 @@ if (process.env.NODE_ENV === 'production' || process.env.DB_HOST || process.env.
             database: process.env.DB_NAME || 'niemis_production',
             username: process.env.DB_USER || 'niemis_user',
             password: process.env.DB_PASSWORD || 'secure_password123',
+            schema: 'school_system',
             logging: process.env.NODE_ENV === 'development' ? console.log : false,
             define: {
                 underscored: true,
                 freezeTableName: true,
                 timestamps: true,
                 createdAt: 'created_at',
-                updatedAt: 'updated_at'
+                updatedAt: 'updated_at',
+                schema: 'school_system'
             },
             pool: {
                 max: parseInt(process.env.DB_POOL_MAX) || 10,

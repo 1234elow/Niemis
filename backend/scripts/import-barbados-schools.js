@@ -2,6 +2,10 @@ const { sequelize } = require('../config/database');
 const BarbadosSchoolImporter = require('../services/barbadosSchoolImporter');
 const { School, Zone, Parish } = require('../models');
 const logger = require('../utils/logger');
+const {
+    BARBADOS_ZONE_DEFINITIONS,
+    resolveBarbadosZoneKeyForSchool
+} = require('../utils/barbadosEducationZones');
 
 /**
  * Production-ready script for importing Barbados schools data
@@ -41,6 +45,9 @@ class ProductionSchoolImporter {
             
             // Import schools with proper zone/parish mapping
             await this.importSchoolsWithMapping(schoolsData, transaction);
+
+            // Reconcile any legacy zone assignments onto canonical 3-zone IDs.
+            await this.reconcileSchoolZoneAssignments(transaction);
             
             await transaction.commit();
             this.importResults.success = true;
@@ -68,7 +75,7 @@ class ProductionSchoolImporter {
             const [results] = await sequelize.query(`
                 SELECT table_name 
                 FROM information_schema.tables 
-                WHERE table_schema = 'public' 
+                WHERE table_schema = 'school_system' 
                 AND table_name IN ('schools', 'zones', 'parishes')
             `);
             
@@ -89,12 +96,8 @@ class ProductionSchoolImporter {
      */
     async ensureZonesAndParishes(transaction) {
         try {
-            // Check if zones exist
-            const zoneCount = await Zone.count({ transaction });
-            if (zoneCount === 0) {
-                logger.info('Creating educational zones...');
-                await this.createEducationalZones(transaction);
-            }
+            // Always enforce canonical three-zone structure.
+            await this.syncEducationalZones(transaction);
             
             // Check if parishes exist
             const parishCount = await Parish.count({ transaction });
@@ -112,31 +115,44 @@ class ProductionSchoolImporter {
     }
 
     /**
+     * Ensure canonical Barbados 3-zone model exists even in existing databases.
+     */
+    async syncEducationalZones(transaction) {
+        const existingZones = await Zone.findAll({ transaction });
+        const zonesByName = new Map(
+            existingZones.map((zone) => [String(zone.name || '').trim().toLowerCase(), zone])
+        );
+
+        for (const definition of BARBADOS_ZONE_DEFINITIONS) {
+            const existing = zonesByName.get(definition.name.toLowerCase());
+            if (!existing) {
+                await Zone.create(
+                    {
+                        name: definition.name,
+                        description: definition.description
+                    },
+                    { transaction }
+                );
+                continue;
+            }
+
+            if ((existing.description || '') !== definition.description) {
+                await existing.update(
+                    { description: definition.description },
+                    { transaction }
+                );
+            }
+        }
+    }
+
+    /**
      * Create educational zones for Barbados
      */
     async createEducationalZones(transaction) {
-        const zones = [
-            {
-                name: 'Zone 1 - North',
-                description: 'Northern parishes including St. Lucy, St. Peter'
-            },
-            {
-                name: 'Zone 2 - East',
-                description: 'Eastern parishes including St. John, St. Joseph'
-            },
-            {
-                name: 'Zone 3 - South',
-                description: 'Southern parishes including Christ Church, St. Philip'
-            },
-            {
-                name: 'Zone 4 - West',
-                description: 'Western parishes including St. James, St. Thomas'
-            },
-            {
-                name: 'Zone 5 - Central',
-                description: 'Central parishes including St. Michael, St. George'
-            }
-        ];
+        const zones = BARBADOS_ZONE_DEFINITIONS.map((zone) => ({
+            name: zone.name,
+            description: zone.description
+        }));
 
         await Zone.bulkCreate(zones, { transaction });
         logger.info(`Created ${zones.length} educational zones`);
@@ -172,18 +188,25 @@ class ProductionSchoolImporter {
         const parishes = await Parish.findAll({ transaction });
         
         // Create mapping objects for efficient lookups
-        const parishMap = new Map(parishes.map(p => [p.name, p.id]));
+        const parishMap = new Map(parishes.map(p => [p.code, p.id]));
         const zoneMap = this.createZoneMapping(zones);
         
         const schoolsWithMapping = [];
         
         for (const school of schoolsData) {
             try {
+                const parishCode = this.normalizeParishCode(school.parish);
+
                 // Map parish to ID
-                const parishId = this.mapParishToId(school.parish, parishMap);
+                const parishId = this.mapParishToId(parishCode, parishMap);
                 
                 // Map parish to zone
-                const zoneId = this.mapParishToZone(school.parish, zoneMap);
+                const zoneId = this.mapParishToZone(
+                    parishCode,
+                    zoneMap,
+                    school.name,
+                    school.school_type
+                );
                 
                 const mappedSchool = {
                     ...school,
@@ -219,49 +242,75 @@ class ProductionSchoolImporter {
     }
 
     /**
+     * Normalize parish values from input file to canonical codes.
+     */
+    normalizeParishCode(value) {
+        const raw = String(value || '').trim();
+        if (!raw) {
+            return null;
+        }
+
+        const directCodeMap = {
+            CC: 'CC',
+            SA: 'SA',
+            SG: 'SG',
+            SJ: 'SJ',
+            SJN: 'SJN',
+            SJO: 'SJO',
+            SL: 'SL',
+            SM: 'SM',
+            SP: 'SP',
+            SPH: 'SPH',
+            ST: 'ST'
+        };
+
+        if (directCodeMap[raw]) {
+            return directCodeMap[raw];
+        }
+
+        const normalized = raw.toLowerCase().replace(/[^a-z]/g, '');
+        const aliasMap = {
+            christchurch: 'CC',
+            standrew: 'SA',
+            stgeorge: 'SG',
+            stjames: 'SJ',
+            stjohn: 'SJN',
+            stjoseph: 'SJO',
+            stlucy: 'SL',
+            stmichael: 'SM',
+            stpeter: 'SP',
+            stphilip: 'SPH',
+            stthomas: 'ST'
+        };
+
+        return aliasMap[normalized] || null;
+    }
+
+    /**
      * Create zone mapping for parish-to-zone assignments
      */
     createZoneMapping(zones) {
-        const zoneMap = new Map();
-        
-        zones.forEach(zone => {
-            switch (zone.name) {
-                case 'Zone 1 - North':
-                    zoneMap.set('St. Lucy', zone.id);
-                    zoneMap.set('St. Peter', zone.id);
-                    break;
-                case 'Zone 2 - East':
-                    zoneMap.set('St. John', zone.id);
-                    zoneMap.set('St. Joseph', zone.id);
-                    zoneMap.set('St. Andrew', zone.id);
-                    break;
-                case 'Zone 3 - South':
-                    zoneMap.set('Christ Church', zone.id);
-                    zoneMap.set('St. Philip', zone.id);
-                    break;
-                case 'Zone 4 - West':
-                    zoneMap.set('St. James', zone.id);
-                    zoneMap.set('St. Thomas', zone.id);
-                    break;
-                case 'Zone 5 - Central':
-                    zoneMap.set('St. Michael', zone.id);
-                    zoneMap.set('St. George', zone.id);
-                    break;
+        return zones.reduce((acc, zone) => {
+            const normalizedName = String(zone.name || '').trim().toLowerCase();
+            if (normalizedName === 'zone 1') {
+                acc.zone_1 = zone.id;
+            } else if (normalizedName === 'zone 2') {
+                acc.zone_2 = zone.id;
+            } else if (normalizedName === 'zone 3') {
+                acc.zone_3 = zone.id;
             }
-        });
-        
-        return zoneMap;
+            return acc;
+        }, {});
     }
 
     /**
      * Map parish name to parish ID
      */
-    mapParishToId(parishName, parishMap) {
-        const normalizedName = parishName.trim();
-        const parishId = parishMap.get(normalizedName);
+    mapParishToId(parishCode, parishMap) {
+        const parishId = parishMap.get(parishCode);
         
         if (!parishId) {
-            throw new Error(`Parish not found: ${normalizedName}`);
+            throw new Error(`Parish not found: ${parishCode || 'unknown'}`);
         }
         
         return parishId;
@@ -270,16 +319,78 @@ class ProductionSchoolImporter {
     /**
      * Map parish to educational zone
      */
-    mapParishToZone(parishName, zoneMap) {
-        const normalizedName = parishName.trim();
-        const zoneId = zoneMap.get(normalizedName);
-        
-        if (!zoneId) {
-            logger.warn(`Zone mapping not found for parish: ${normalizedName}`);
+    mapParishToZone(parishCode, zoneMap, schoolName, schoolType) {
+        const zoneKey = resolveBarbadosZoneKeyForSchool({
+            schoolName,
+            schoolType,
+            parishCode
+        });
+        if (!zoneKey) {
+            logger.warn(`Zone mapping not found for school: ${schoolName} (${parishCode || 'unknown parish'})`);
             return null;
         }
-        
-        return zoneId;
+        return zoneMap[zoneKey] || null;
+    }
+
+    /**
+     * Re-map any remaining schools onto canonical zone IDs and clean unreferenced legacy zones.
+     */
+    async reconcileSchoolZoneAssignments(transaction) {
+        const zones = await Zone.findAll({ transaction });
+        const zoneMap = this.createZoneMapping(zones);
+        const canonicalZoneNames = new Set(BARBADOS_ZONE_DEFINITIONS.map((zone) => zone.name.toLowerCase()));
+
+        if (!zoneMap.zone_1 || !zoneMap.zone_2 || !zoneMap.zone_3) {
+            logger.warn('Canonical zone IDs were not fully resolved during reconciliation.');
+            return;
+        }
+
+        const schools = await School.findAll({
+            attributes: ['id', 'name', 'school_type', 'parish', 'zone_id'],
+            include: [
+                {
+                    model: Parish,
+                    attributes: ['code'],
+                    required: false
+                }
+            ],
+            transaction
+        });
+
+        for (const school of schools) {
+            const parishCode =
+                this.normalizeParishCode(school.parish) ||
+                school.Parish?.code ||
+                null;
+            const zoneKey = resolveBarbadosZoneKeyForSchool({
+                schoolName: school.name,
+                schoolType: school.school_type,
+                parishCode
+            });
+            const targetZoneId = zoneMap[zoneKey] || null;
+
+            if (!targetZoneId || school.zone_id === targetZoneId) {
+                continue;
+            }
+
+            await school.update({ zone_id: targetZoneId }, { transaction });
+        }
+
+        const refreshedZones = await Zone.findAll({ transaction });
+        for (const zone of refreshedZones) {
+            const normalizedName = String(zone.name || '').trim().toLowerCase();
+            if (canonicalZoneNames.has(normalizedName)) {
+                continue;
+            }
+
+            const linkedSchools = await School.count({
+                where: { zone_id: zone.id },
+                transaction
+            });
+            if (linkedSchools === 0) {
+                await zone.destroy({ transaction });
+            }
+        }
     }
 
     /**

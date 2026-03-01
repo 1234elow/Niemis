@@ -1,0 +1,48 @@
+# Vercel ignore file for NiEMIS frontend
+
+# Development files
+.env.local
+.env.development
+.env.example
+*.log
+.DS_Store
+
+# Test files
+coverage/
+.nyc_output/
+test-results/
+
+# Build artifacts (handled by Vercel)
+node_modules/
+.vite/
+.cache/
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS generated files
+Thumbs.db
+.DS_Store
+
+# Temporary files
+*.tmp
+*.temp
+*.pid
+
+# Documentation (not needed for deployment)
+README.md
+DEPLOYMENT.md
+docs/
+
+# Backend files (not part of frontend deployment)
+../backend/
+../database/
+../config/
+
+# Docker files (not needed for Vercel)
+Dockerfile
+docker-compose.yml
+.dockerignore

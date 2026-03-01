@@ -1,16 +1,43 @@
 const express = require('express');
 const { body, validationResult, query } = require('express-validator');
-const { School, Zone, Parish, Staff, Student, Facility, Op } = require('../models');
+const { School, Zone, Parish, Staff, Student, Facility } = require('../models');
+const { Op } = require('sequelize');
 const { requireRole } = require('../middleware/auth');
 const BarbadosSchoolImporter = require('../services/barbadosSchoolImporter');
 const logger = require('../utils/logger');
 
 const router = express.Router();
 
+// Get all parishes
+router.get('/parishes', async (req, res, next) => {
+    try {
+        const parishes = await Parish.findAll({
+            attributes: ['id', 'name', 'code'],
+            order: [['name', 'ASC']]
+        });
+        res.json(parishes);
+    } catch (error) {
+        next(error);
+    }
+});
+
+// Get all zones
+router.get('/zones', async (req, res, next) => {
+    try {
+        const zones = await Zone.findAll({
+            attributes: ['id', 'name'],
+            order: [['name', 'ASC']]
+        });
+        res.json(zones);
+    } catch (error) {
+        next(error);
+    }
+});
+
 // Get all schools with filtering and pagination
 router.get('/', [
-    query('page').optional().isInt({ min: 1 }),
-    query('limit').optional().isInt({ min: 1, max: 100 }),
+    query('page').optional().isInt({ min: 1 }).toInt(),
+    query('limit').optional().isInt({ min: 1, max: 500 }).toInt(),
     query('school_type').optional().isIn(['pre_primary', 'primary', 'secondary']),
     query('zone_id').optional().isUUID(),
     query('parish_id').optional().isUUID()
@@ -30,6 +57,7 @@ router.get('/', [
             school_type, 
             zone_id, 
             parish_id, 
+            parish,
             search 
         } = req.query;
 
@@ -40,6 +68,21 @@ router.get('/', [
         if (school_type) whereClause.school_type = school_type;
         if (zone_id) whereClause.zone_id = zone_id;
         if (parish_id) whereClause.parish_id = parish_id;
+        
+        // Handle parish filter by parish code or name
+        if (parish) {
+            const parishRecord = await Parish.findOne({
+                where: {
+                    [Op.or]: [
+                        { code: parish.toUpperCase() },
+                        { name: { [Op.iLike]: `%${parish}%` } }
+                    ]
+                }
+            });
+            if (parishRecord) {
+                whereClause.parish_id = parishRecord.id;
+            }
+        }
         if (search) {
             whereClause[Op.or] = [
                 { name: { [Op.iLike]: `%${search}%` } },
@@ -137,6 +180,7 @@ router.post('/', requireRole(['super_admin', 'admin']), [
     body('school_type').isIn(['pre_primary', 'primary', 'secondary']),
     body('zone_id').isUUID(),
     body('parish_id').isUUID(),
+    body('offers_sixth_form').optional().isBoolean().toBoolean(),
     body('email').optional().isEmail(),
     body('phone').optional().matches(/^[\+]?[0-9\s\-\(\)]+$/),
     body('capacity').optional().isInt({ min: 1 })
@@ -170,6 +214,7 @@ router.put('/:id', requireRole(['super_admin', 'admin']), [
     body('school_type').optional().isIn(['pre_primary', 'primary', 'secondary']),
     body('zone_id').optional().isUUID(),
     body('parish_id').optional().isUUID(),
+    body('offers_sixth_form').optional().isBoolean().toBoolean(),
     body('email').optional().isEmail(),
     body('phone').optional().matches(/^[\+]?[0-9\s\-\(\)]+$/),
     body('capacity').optional().isInt({ min: 1 })

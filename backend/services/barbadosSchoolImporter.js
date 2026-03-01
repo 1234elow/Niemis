@@ -9,15 +9,15 @@ const logger = require('../utils/logger');
 class BarbadosSchoolImporter {
     constructor() {
         this.parishMapping = {
-            'St. Michael': 'st_michael',
-            'Christ Church': 'christ_church',
-            'St. Philip': 'st_philip',
-            'St. James': 'st_james',
-            'St. John': 'st_john',
-            'St. Andrew': 'st_andrew',
-            'St. George': 'st_george',
-            'St. Peter': 'st_peter',
-            'St. Lucy': 'st_lucy'
+            'St. Michael': 'SM',
+            'Christ Church': 'CC',
+            'St. Philip': 'SPH',
+            'St. James': 'SJ',
+            'St. John': 'SJN',
+            'St. Andrew': 'SA',
+            'St. George': 'SG',
+            'St. Peter': 'SP',
+            'St. Lucy': 'SL'
         };
 
         this.categoryMapping = {
@@ -32,7 +32,7 @@ class BarbadosSchoolImporter {
     /**
      * Parse the complete schools.txt file and extract all school data
      */
-    async parseSchoolsFile(filePath = '/mnt/c/Users/SamuelLowe/NiEMIS/schools.txt') {
+    async parseSchoolsFile(filePath = 'C:\\Users\\SamuelLowe\\NiEMIS\\schools.txt') {
         try {
             const fileContent = await fs.readFile(filePath, 'utf8');
             const lines = fileContent.split('\n').map(line => line.trim());
@@ -126,6 +126,7 @@ class BarbadosSchoolImporter {
                 school_category: category,
                 parish,
                 student_population,
+                offers_sixth_form: false,
                 last_enrollment_update: new Date().toISOString().split('T')[0],
                 is_active: true,
                 description: `${category.charAt(0).toUpperCase() + category.slice(1)} school in ${parishText.trim()}`

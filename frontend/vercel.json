@@ -1,0 +1,130 @@
+{
+  "version": 2,
+  "name": "niemis-frontend",
+  "alias": ["niemis.vercel.app"],
+  "builds": [
+    {
+      "src": "package.json",
+      "use": "@vercel/static-build",
+      "config": {
+        "distDir": "build"
+      }
+    }
+  ],
+  "buildCommand": "npm run build",
+  "outputDirectory": "build",
+  "installCommand": "npm ci",
+  "framework": "vite",
+  "routes": [
+    {
+      "src": "/api/(.*)",
+      "dest": "https://niemis-backend.onrender.com/api/$1",
+      "headers": {
+        "Cache-Control": "no-cache"
+      }
+    },
+    {
+      "src": "/static/(.*)",
+      "headers": {
+        "Cache-Control": "public, max-age=31536000, immutable"
+      }
+    },
+    {
+      "src": "/(.*\\.(js|css|ico|png|jpg|jpeg|gif|svg|webp|woff|woff2|ttf|eot))",
+      "headers": {
+        "Cache-Control": "public, max-age=31536000, immutable"
+      }
+    },
+    {
+      "src": "/sw.js",
+      "headers": {
+        "Cache-Control": "public, max-age=3600, must-revalidate",
+        "Service-Worker-Allowed": "/"
+      }
+    },
+    {
+      "src": "/manifest.json",
+      "headers": {
+        "Cache-Control": "public, max-age=86400, must-revalidate"
+      }
+    },
+    {
+      "src": "/(.*)",
+      "dest": "/index.html",
+      "headers": {
+        "Cache-Control": "public, max-age=3600, must-revalidate"
+      }
+    }
+  ],
+  "headers": [
+    {
+      "source": "/(.*)",
+      "headers": [
+        {
+          "key": "X-Content-Type-Options",
+          "value": "nosniff"
+        },
+        {
+          "key": "X-Frame-Options",
+          "value": "DENY"
+        },
+        {
+          "key": "X-XSS-Protection",
+          "value": "1; mode=block"
+        },
+        {
+          "key": "Referrer-Policy",
+          "value": "strict-origin-when-cross-origin"
+        },
+        {
+          "key": "Permissions-Policy",
+          "value": "geolocation=('self'), microphone=(), camera=(), payment=(), usb=(), magnetometer=(), gyroscope=(), accelerometer=()"
+        },
+        {
+          "key": "Strict-Transport-Security",
+          "value": "max-age=31536000; includeSubDomains"
+        }
+      ]
+    },
+    {
+      "source": "/(.*)",
+      "headers": [
+        {
+          "key": "Content-Security-Policy",
+          "value": "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://vercel.live https://vitals.vercel-analytics.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: blob: https://*.amazonaws.com https://picsum.photos; connect-src 'self' https://niemis-backend.onrender.com https://vitals.vercel-analytics.com wss://*.vercel.app; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'; upgrade-insecure-requests"
+        }
+      ]
+    }
+  ],
+  "redirects": [
+    {
+      "source": "/dashboard",
+      "destination": "/",
+      "permanent": true
+    },
+    {
+      "source": "/login.html",
+      "destination": "/login",
+      "permanent": true
+    },
+    {
+      "source": "/admin",
+      "destination": "/",
+      "permanent": true
+    }
+  ],
+  "rewrites": [
+    {
+      "source": "/health",
+      "destination": "/index.html"
+    }
+  ],
+  "functions": {
+    "app/api/**/*.js": {
+      "runtime": "nodejs18.x"
+    }
+  },
+  "regions": ["iad1"],
+  "cleanUrls": true,
+  "trailingSlash": false
+}

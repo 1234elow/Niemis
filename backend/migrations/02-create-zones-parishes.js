@@ -124,36 +124,24 @@ module.exports = {
       }
     ]);
 
-    // Insert Barbados educational zones
+    // Insert Barbados educational zones (3-zone model used by BSSEE placement workflows)
     await queryInterface.bulkInsert('zones', [
       {
         id: require('uuid').v4(),
-        name: 'Zone 1 - North',
-        description: 'Northern parishes including St. Lucy, St. Peter',
+        name: 'Zone 1',
+        description: 'Northern and western catchment for secondary placement.',
         created_at: new Date()
       },
       {
         id: require('uuid').v4(),
-        name: 'Zone 2 - East',
-        description: 'Eastern parishes including St. John, St. Joseph',
+        name: 'Zone 2',
+        description: 'Central and inland catchment for secondary placement.',
         created_at: new Date()
       },
       {
         id: require('uuid').v4(),
-        name: 'Zone 3 - South',
-        description: 'Southern parishes including Christ Church, St. Philip',
-        created_at: new Date()
-      },
-      {
-        id: require('uuid').v4(),
-        name: 'Zone 4 - West',
-        description: 'Western parishes including St. James, St. Thomas',
-        created_at: new Date()
-      },
-      {
-        id: require('uuid').v4(),
-        name: 'Zone 5 - Central',
-        description: 'Central parishes including St. Michael, St. George',
+        name: 'Zone 3',
+        description: 'Southern and eastern catchment for secondary placement.',
         created_at: new Date()
       }
     ]);

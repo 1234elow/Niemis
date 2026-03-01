@@ -1,7 +1,12 @@
 {
   "development": {
-    "dialect": "sqlite",
-    "storage": "./niemis_demo.db",
+    "username": "postgres",
+    "password": "141017",
+    "database": "postgres",
+    "schema": "school_system",
+    "host": "localhost",
+    "port": 5432,
+    "dialect": "postgres",
     "logging": true,
     "define": {
       "underscored": true,
@@ -9,6 +14,15 @@
       "timestamps": true,
       "createdAt": "created_at",
       "updatedAt": "updated_at"
+    },
+    "pool": {
+      "max": 10,
+      "min": 2,
+      "acquire": 30000,
+      "idle": 10000
+    },
+    "dialectOptions": {
+      "ssl": false
     }
   },
   "test": {

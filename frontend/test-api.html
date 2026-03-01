@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>API Test</title>
+</head>
+<body>
+    <h1>NiEMIS API Test</h1>
+    <button onclick="testLogin()">Test Admin Login</button>
+    <button onclick="testStudentLogin()">Test Student Login</button>
+    <button onclick="testFullFlow()">Test Full Login Flow</button>
+    <div id="result"></div>
+
+    <script>
+        async function testLogin() {
+            try {
+                const response = await fetch('http://localhost:5000/api/auth/login', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        login: 'admin',
+                        password: 'admin123'
+                    })
+                });
+
+                const data = await response.json();
+                document.getElementById('result').innerHTML = 
+                    `<h3>Admin Login Result:</h3>
+                     <p>Status: ${response.status}</p>
+                     <pre>${JSON.stringify(data, null, 2)}</pre>`;
+            } catch (error) {
+                document.getElementById('result').innerHTML = 
+                    `<h3>Error:</h3><p>${error.message}</p>`;
+            }
+        }
+
+        async function testStudentLogin() {
+            try {
+                const response = await fetch('http://localhost:5000/api/auth/login', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        login: 'alex_student1',
+                        password: 'student123'
+                    })
+                });
+
+                const data = await response.json();
+                document.getElementById('result').innerHTML = 
+                    `<h3>Student Login Result:</h3>
+                     <p>Status: ${response.status}</p>
+                     <pre>${JSON.stringify(data, null, 2)}</pre>`;
+            } catch (error) {
+                document.getElementById('result').innerHTML = 
+                    `<h3>Error:</h3><p>${error.message}</p>`;
+            }
+        }
+
+        async function testFullFlow() {
+            try {
+                // Step 1: Login
+                const loginResponse = await fetch('http://localhost:5000/api/auth/login', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        login: 'admin',
+                        password: 'admin123'
+                    })
+                });
+
+                const loginData = await loginResponse.json();
+                
+                if (loginResponse.ok) {
+                    // Step 2: Get profile
+                    const profileResponse = await fetch('http://localhost:5000/api/auth/profile', {
+                        headers: {
+                            'Authorization': `Bearer ${loginData.token}`
+                        }
+                    });
+
+                    const profileData = await profileResponse.json();
+
+                    document.getElementById('result').innerHTML = 
+                        `<h3>Full Login Flow Result:</h3>
+                         <p>Login Status: ${loginResponse.status}</p>
+                         <p>Profile Status: ${profileResponse.status}</p>
+                         <h4>Login Data:</h4>
+                         <pre>${JSON.stringify(loginData, null, 2)}</pre>
+                         <h4>Profile Data:</h4>
+                         <pre>${JSON.stringify(profileData, null, 2)}</pre>`;
+                } else {
+                    document.getElementById('result').innerHTML = 
+                        `<h3>Login Failed:</h3>
+                         <p>Status: ${loginResponse.status}</p>
+                         <pre>${JSON.stringify(loginData, null, 2)}</pre>`;
+                }
+            } catch (error) {
+                document.getElementById('result').innerHTML = 
+                    `<h3>Error:</h3><p>${error.message}</p>`;
+            }
+        }
+    </script>
+</body>
+</html>

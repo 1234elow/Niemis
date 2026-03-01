@@ -5,6 +5,8 @@ const { body, validationResult } = require('express-validator');
 const { User, Staff, Student, Parent, AuditLog } = require('../models');
 const logger = require('../utils/logger');
 const { Op } = require('sequelize');
+const { authMiddleware } = require('../middleware/auth');
+const { resolveAccessContextForUser, getAccessControlMatrix } = require('../middleware/accessControl');
 
 const router = express.Router();
 
@@ -121,28 +123,62 @@ router.post('/login', [
         });
 
         if (!user || !user.is_active) {
+            try {
+                await AuditLog.create({
+                    user_id: user?.id || null,
+                    action: 'USER_LOGIN_FAILED',
+                    table_name: 'users',
+                    record_id: user?.id || null,
+                    new_values: {
+                        reason: !user ? 'user_not_found' : 'user_inactive',
+                        login_identifier: String(login || '').slice(0, 120)
+                    },
+                    ip_address: req.ip,
+                    user_agent: req.get('User-Agent')
+                });
+            } catch (auditError) {
+                logger.warn('Failed to log USER_LOGIN_FAILED (missing/inactive user)', {
+                    error: auditError.message
+                });
+            }
             return res.status(401).json({ error: 'Invalid credentials' });
         }
 
         // Verify password
         const isPasswordValid = await bcrypt.compare(password, user.password_hash);
         if (!isPasswordValid) {
+            try {
+                await AuditLog.create({
+                    user_id: user.id,
+                    action: 'USER_LOGIN_FAILED',
+                    table_name: 'users',
+                    record_id: user.id,
+                    new_values: {
+                        reason: 'invalid_password',
+                        login_identifier: String(login || '').slice(0, 120)
+                    },
+                    ip_address: req.ip,
+                    user_agent: req.get('User-Agent')
+                });
+            } catch (auditError) {
+                logger.warn('Failed to log USER_LOGIN_FAILED (invalid password)', {
+                    error: auditError.message
+                });
+            }
             return res.status(401).json({ error: 'Invalid credentials' });
         }
 
         // Update last login
         await user.update({ last_login: new Date() });
 
-        // Generate JWT token
-        const token = jwt.sign(
-            { 
-                id: user.id, 
-                username: user.username, 
-                role: user.role 
-            },
-            process.env.JWT_SECRET,
-            { expiresIn: process.env.JWT_EXPIRES_IN || '24h' }
-        );
+        // Generate JWT token using JWT manager
+        const { jwtManager } = require('../config/jwt');
+        const tokenResult = jwtManager.generateAccessToken({
+            id: user.id, 
+            username: user.username, 
+            role: user.role 
+        });
+        const token = tokenResult.token;
 
         // Log login
         await AuditLog.create({
@@ -156,6 +192,8 @@ router.post('/login', [
 
         logger.info(`User logged in: ${user.username}`);
 
+        const access = await resolveAccessContextForUser(user);
+
         res.json({
             message: 'Login successful',
             token,
@@ -165,7 +203,13 @@ router.post('/login', [
                 email: user.email,
                 role: user.role,
                 last_login: user.last_login
-            }
+            },
+            access: access ? {
+                access_role: access.access_role,
+                scope: access.scope,
+                school_id: access.school_id,
+                permissions: access.permissions
+            } : null
         });
 
     } catch (error) {
@@ -174,15 +218,9 @@ router.post('/login', [
 });
 
 // Get current user profile
-router.get('/profile', async (req, res, next) => {
+router.get('/profile', authMiddleware, async (req, res, next) => {
     try {
-        const token = req.header('Authorization')?.replace('Bearer ', '');
-        if (!token) {
-            return res.status(401).json({ error: 'No token provided' });
-        }
-
-        const decoded = jwt.verify(token, process.env.JWT_SECRET);
-        const user = await User.findByPk(decoded.id, {
+        const user = await User.findByPk(req.user.id, {
             attributes: { exclude: ['password_hash'] }
         });
 
@@ -190,8 +228,55 @@ router.get('/profile', async (req, res, next) => {
             return res.status(404).json({ error: 'User not found' });
         }
 
-        res.json({ user });
+        const access = await resolveAccessContextForUser(user);
 
+        res.json({
+            user,
+            access: access ? {
+                access_role: access.access_role,
+                scope: access.scope,
+                school_id: access.school_id,
+                permissions: access.permissions
+            } : null
+        });
+
+    } catch (error) {
+        next(error);
+    }
+});
+
+// Access profile for current user
+router.get('/access', authMiddleware, async (req, res, next) => {
+    try {
+        const access = await resolveAccessContextForUser(req.user);
+        res.json({
+            access: access ? {
+                access_role: access.access_role,
+                scope: access.scope,
+                school_id: access.school_id,
+                staff_id: access.staff_id,
+                student_id: access.student_id,
+                parent_id: access.parent_id,
+                child_student_ids: access.child_student_ids,
+                permissions: access.permissions
+            } : null
+        });
+    } catch (error) {
+        next(error);
+    }
+});
+
+// Access matrix (Super Admin only)
+router.get('/access-matrix', authMiddleware, async (req, res, next) => {
+    try {
+        if (req.user.role !== 'super_admin') {
+            return res.status(403).json({
+                error: 'Only Super Admin can view the full access-control matrix.',
+                code: 'ACCESS_MATRIX_FORBIDDEN'
+            });
+        }
+
+        res.json(getAccessControlMatrix());
     } catch (error) {
         next(error);
     }

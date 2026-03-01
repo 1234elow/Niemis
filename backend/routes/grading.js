@@ -1,6 +1,5 @@
 const express = require('express');
 const { body, validationResult } = require('express-validator');
-const ExcelJS = require('exceljs');
 const { 
     Subject, Class, Term, Grade, ReportCard, Student, Staff, School, 
     Parent, StudentParentRelationship, StudentHealth, FamilySocialAssessment, 
@@ -365,7 +364,7 @@ router.post('/report-cards/generate', [
     }
 });
 
-// Export grades to Excel
+// Export grades to CSV
 router.get('/export/grades/:classId/:termId', async (req, res, next) => {
     try {
         const { classId, termId } = req.params;
@@ -409,35 +408,15 @@ router.get('/export/grades/:classId/:termId', async (req, res, next) => {
             order: [['name', 'ASC']]
         });
 
-        // Create Excel workbook
-        const workbook = new ExcelJS.Workbook();
-        
-        // Class Summary Sheet
-        const summarySheet = workbook.addWorksheet('Class Summary');
-        
-        // Header information
-        summarySheet.mergeCells('A1:H1');
-        summarySheet.getCell('A1').value = `${classInfo.School.name} - ${classInfo.name} Grade Report`;
-        summarySheet.getCell('A1').font = { bold: true, size: 16 };
-        summarySheet.getCell('A1').alignment = { horizontal: 'center' };
-
-        summarySheet.mergeCells('A2:H2');
-        summarySheet.getCell('A2').value = `${termInfo.name} ${termInfo.school_year}`;
-        summarySheet.getCell('A2').font = { bold: true, size: 12 };
-        summarySheet.getCell('A2').alignment = { horizontal: 'center' };
-
-        // Headers
-        const headers = ['Student ID', 'Name', 'DOB', 'Gender', ...subjects.map(s => s.code), 'Overall', 'Comments'];
-        summarySheet.addRow([]);
-        const headerRow = summarySheet.addRow(headers);
-        headerRow.font = { bold: true };
-        headerRow.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE0E0E0' } };
+        // Create CSV data
+        const headers = ['Student ID', 'Name', 'DOB', 'Gender', ...subjects.map(s => s.code), 'Overall'];
+        csvData.push(headers.join(','));
 
         // Student data
         for (const student of students) {
             const row = [
                 student.student_id,
-                `${student.first_name} ${student.last_name}`,
+                `"${student.first_name} ${student.last_name}"`,
                 student.date_of_birth,
                 student.gender
             ];
@@ -452,79 +431,18 @@ router.get('/export/grades/:classId/:termId', async (req, res, next) => {
             const gradeValues = student.Grades.map(g => g.grade_value);
             const overallGrade = calculateOverallGrade(gradeValues);
             row.push(overallGrade);
-            row.push('See individual report card');
 
-            summarySheet.addRow(row);
+            csvData.push(row.join(','));
         }
 
-        // Auto-fit columns
-        summarySheet.columns.forEach(column => {
-            column.width = 15;
-        });
+        // Return CSV
+        const csvContent = csvData.join('\\n');
+        
+        res.setHeader('Content-Type', 'text/csv');
+        res.setHeader('Content-Disposition', `attachment; filename="${classInfo.name}_${termInfo.name}_grades.csv"`);
+        res.send(csvContent);
 
-        // Individual Student Sheets
-        for (const student of students) {
-            const studentSheet = workbook.addWorksheet(`${student.first_name} ${student.last_name}`);
-            
-            // Student information
-            studentSheet.mergeCells('A1:D1');
-            studentSheet.getCell('A1').value = `Student Report Card - ${student.first_name} ${student.last_name}`;
-            studentSheet.getCell('A1').font = { bold: true, size: 14 };
-
-            studentSheet.addRow(['Student ID:', student.student_id]);
-            studentSheet.addRow(['Class:', classInfo.name]);
-            studentSheet.addRow(['Term:', `${termInfo.name} ${termInfo.school_year}`]);
-            studentSheet.addRow(['Date of Birth:', student.date_of_birth]);
-            studentSheet.addRow([]);
-
-            // Parent information
-            const primaryParent = student.Parents.find(p => p.StudentParentRelationship.is_primary);
-            if (primaryParent) {
-                studentSheet.addRow(['Primary Contact:', `${primaryParent.first_name} ${primaryParent.last_name}`]);
-                studentSheet.addRow(['Phone:', primaryParent.phone]);
-                studentSheet.addRow([]);
-            }
-
-            // Health information
-            if (student.StudentHealth) {
-                studentSheet.addRow(['Health Information:']);
-                studentSheet.addRow(['Medical Conditions:', student.StudentHealth.medical_conditions || 'None']);
-                studentSheet.addRow(['Allergies:', student.StudentHealth.allergies || 'None']);
-                studentSheet.addRow(['Medications:', student.StudentHealth.medications || 'None']);
-                studentSheet.addRow([]);
-            }
-
-            // Grades
-            studentSheet.addRow(['Subject', 'Grade', 'Effort', 'Behavior', 'Teacher Comments']);
-            const gradeHeaderRow = studentSheet.lastRow;
-            gradeHeaderRow.font = { bold: true };
-            gradeHeaderRow.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE0E0E0' } };
-
-            for (const grade of student.Grades) {
-                studentSheet.addRow([
-                    grade.Subject.name,
-                    grade.grade_value,
-                    grade.effort_grade,
-                    grade.behavior_grade,
-                    grade.teacher_comments || ''
-                ]);
-            }
-
-            // Auto-fit columns
-            studentSheet.columns.forEach(column => {
-                column.width = 20;
-            });
-        }
-
-        // Set response headers for file download
-        res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-        res.setHeader('Content-Disposition', `attachment; filename="${classInfo.name}_${termInfo.name}_Grades.xlsx"`);
-
-        // Write to response
-        await workbook.xlsx.write(res);
-        res.end();
-
-        logger.info(`Excel report generated for class ${classInfo.name}, term ${termInfo.name}`);
+        logger.info(`CSV report generated for class ${classInfo.name}, term ${termInfo.name}`);
     } catch (error) {
         next(error);
     }

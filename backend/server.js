@@ -4,9 +4,17 @@ const helmet = require('helmet');
 const compression = require('compression');
 const morgan = require('morgan');
 const path = require('path');
+const { Sequelize } = require('sequelize');
 require('dotenv').config();
 
-const { sequelize } = require('./models');
+const {
+    sequelize,
+    SchoolDayPolicy,
+    ClassTimetableSlot,
+    GradingPolicy,
+    DataQualityIssue,
+    DataQualitySnapshot
+} = require('./models');
 const authRoutes = require('./routes/auth');
 const schoolRoutes = require('./routes/schools');
 const studentRoutes = require('./routes/students');
@@ -17,10 +25,15 @@ const reportRoutes = require('./routes/reports');
 const rfidRoutes = require('./routes/rfid');
 const gradingRoutes = require('./routes/grading');
 const adminRoutes = require('./routes/admin');
+const setupRoutes = require('./routes/setup');
 
 const logger = require('./utils/logger');
 const { errorHandler, notFoundHandler, timeoutHandler } = require('./middleware/errorHandler');
 const { authMiddleware, refreshToken, jwtHealthCheck, jwtMetrics, revokeToken } = require('./middleware/auth');
+const { attachAccessContext, authorizeRouteGroup } = require('./middleware/accessControl');
+const { createApiActivityAuditMiddleware } = require('./middleware/apiActivityAudit');
+const socketService = require('./services/socketService');
+const redisManager = require('./config/redis');
 const { 
     generalLimiter, 
     authLimiter, 
@@ -127,18 +140,22 @@ app.use(express.urlencoded({
     limit: process.env.UPLOAD_MAX_FILE_SIZE || '10mb' 
 }));
 
-// Dynamic rate limiting based on server load
-app.use(createDynamicRateLimiter());
+// Dynamic rate limiting based on server load (disabled for development)
+if (isProduction) {
+    app.use(createDynamicRateLimiter());
+}
 
-// Rate limiting middleware
-if (process.env.ENABLE_RATE_LIMITING === 'true') {
+// Rate limiting middleware (disabled for development)
+if (process.env.ENABLE_RATE_LIMITING === 'true' && isProduction) {
     app.use(generalLimiter);
     app.use('/api/auth/login', authLimiter);
     app.use('/api/auth/register', authLimiter);
 }
 
-// Student adaptive rate limiting
-app.use(studentAdaptiveLimiter);
+// Student adaptive rate limiting (disabled for development)
+if (isProduction) {
+    app.use(studentAdaptiveLimiter);
+}
 
 // Request logging middleware
 if (process.env.ENABLE_REQUEST_LOGGING === 'true') {
@@ -226,6 +243,445 @@ app.post('/api/security/unblock-ip', authMiddleware, unblockIPEndpoint);
 // CORS management endpoints (admin only)
 app.post('/api/security/cors/add-temp-origin', authMiddleware, addTempOriginEndpoint);
 app.post('/api/security/cors/remove-temp-origin', authMiddleware, removeTempOriginEndpoint);
+
+// Debug endpoint without authentication 
+app.get('/api/debug-staff', async (req, res) => {
+    try {
+        const { Staff, User } = require('./models');
+        
+        // Get all staff records
+        const staff = await Staff.findAll({ 
+            attributes: ['id', 'user_id', 'employee_id', 'first_name', 'last_name'],
+            limit: 10
+        });
+        
+        // Get all teacher users  
+        const teachers = await User.findAll({
+            where: { role: 'teacher' },
+            attributes: ['id', 'username', 'email']
+        });
+        
+        res.json({
+            message: 'Staff-User relationship debug info (public)',
+            staff: staff.map(s => ({
+                id: s.id,
+                user_id: s.user_id,
+                employee_id: s.employee_id,
+                name: `${s.first_name} ${s.last_name}`
+            })),
+            teachers: teachers.map(t => ({
+                id: t.id,
+                username: t.username,
+                email: t.email
+            })),
+            timestamp: new Date().toISOString()
+        });
+    } catch (error) {
+        res.status(500).json({ 
+            error: error.message,
+            message: 'Debug endpoint failed' 
+        });
+    }
+});
+
+// Fix staff-user relationships endpoint
+app.post('/api/fix-teacher-links', async (req, res) => {
+    try {
+        const { Staff, User } = require('./models');
+        
+        // Get teacher1 user
+        const teacher1 = await User.findOne({
+            where: { username: 'teacher1' }
+        });
+        
+        if (!teacher1) {
+            return res.status(404).json({ error: 'teacher1 user not found' });
+        }
+        
+        // Get first staff record without a user_id (we'll assign it to teacher1)
+        const staff1 = await Staff.findOne({
+            where: { user_id: null }
+        });
+        
+        if (!staff1) {
+            return res.status(404).json({ error: 'No available staff record found' });
+        }
+        
+        // Link them together
+        await staff1.update({ 
+            user_id: teacher1.id,
+            employee_id: teacher1.username // Also update employee_id to match
+        });
+        
+        // Get other teachers and staff for bulk assignment
+        const otherTeachers = await User.findAll({
+            where: { 
+                role: 'teacher',
+                username: { [require('sequelize').Op.ne]: 'teacher1' }
+            }
+        });
+        
+        const otherStaff = await Staff.findAll({
+            where: { user_id: null },
+            limit: otherTeachers.length
+        });
+        
+        // Link remaining teachers to staff
+        const updates = [];
+        for (let i = 0; i < Math.min(otherTeachers.length, otherStaff.length); i++) {
+            updates.push(
+                otherStaff[i].update({
+                    user_id: otherTeachers[i].id,
+                    employee_id: otherTeachers[i].username
+                })
+            );
+        }
+        
+        await Promise.all(updates);
+        
+        res.json({
+            message: 'Teacher-staff relationships fixed successfully!',
+            teacher1_linked: {
+                user_id: teacher1.id,
+                username: teacher1.username,
+                staff_id: staff1.id,
+                staff_name: `${staff1.first_name} ${staff1.last_name}`
+            },
+            total_links_created: 1 + updates.length,
+            timestamp: new Date().toISOString()
+        });
+        
+    } catch (error) {
+        res.status(500).json({ 
+            error: error.message,
+            message: 'Fix endpoint failed' 
+        });
+    }
+});
+
+// Fix staff-user relationships endpoint (GET version for easy browser access)
+app.get('/api/fix-teacher-links-get', async (req, res) => {
+    try {
+        const { Staff, User } = require('./models');
+        
+        // Get teacher1 user
+        const teacher1 = await User.findOne({
+            where: { username: 'teacher1' }
+        });
+        
+        if (!teacher1) {
+            return res.status(404).json({ error: 'teacher1 user not found' });
+        }
+        
+        // Get first staff record without a user_id (we'll assign it to teacher1)
+        const staff1 = await Staff.findOne({
+            where: { user_id: null }
+        });
+        
+        if (!staff1) {
+            return res.status(404).json({ error: 'No available staff record found' });
+        }
+        
+        // Link them together
+        await staff1.update({ 
+            user_id: teacher1.id,
+            employee_id: teacher1.username
+        });
+        
+        // Get other teachers and staff for bulk assignment
+        const otherTeachers = await User.findAll({
+            where: { 
+                role: 'teacher',
+                username: { [require('sequelize').Op.ne]: 'teacher1' }
+            }
+        });
+        
+        const otherStaff = await Staff.findAll({
+            where: { user_id: null },
+            limit: otherTeachers.length
+        });
+        
+        // Link remaining teachers to staff
+        const updates = [];
+        for (let i = 0; i < Math.min(otherTeachers.length, otherStaff.length); i++) {
+            updates.push(
+                otherStaff[i].update({
+                    user_id: otherTeachers[i].id,
+                    employee_id: otherTeachers[i].username
+                })
+            );
+        }
+        
+        await Promise.all(updates);
+        
+        res.json({
+            message: 'Teacher-staff relationships fixed successfully!',
+            teacher1_linked: {
+                user_id: teacher1.id,
+                username: teacher1.username,
+                staff_id: staff1.id,
+                staff_name: `${staff1.first_name} ${staff1.last_name}`
+            },
+            total_links_created: 1 + updates.length,
+            success: true,
+            timestamp: new Date().toISOString()
+        });
+        
+    } catch (error) {
+        res.status(500).json({ 
+            error: error.message,
+            message: 'Fix endpoint failed',
+            success: false
+        });
+    }
+});
+
+// Debug class-student relationships
+app.get('/api/debug-classes', async (req, res) => {
+    try {
+        const { Class, Student, Staff } = require('./models');
+        
+        // Get all classes with teacher info
+        const classes = await Class.findAll({
+            attributes: ['id', 'name', 'grade_level', 'section', 'class_teacher_id', 'current_enrollment'],
+            include: [
+                {
+                    model: Staff,
+                    as: 'classTeacher',
+                    attributes: ['first_name', 'last_name', 'employee_id'],
+                    required: false
+                }
+            ],
+            limit: 10
+        });
+        
+        // Get students and their class assignments
+        const students = await Student.findAll({
+            attributes: ['id', 'first_name', 'last_name', 'class_id', 'grade_level'],
+            limit: 10
+        });
+        
+        res.json({
+            message: 'Class-Student relationship debug info',
+            classes: classes.map(c => ({
+                id: c.id,
+                name: c.name,
+                grade_level: c.grade_level,
+                section: c.section,
+                teacher_id: c.class_teacher_id,
+                teacher_name: c.classTeacher ? `${c.classTeacher.first_name} ${c.classTeacher.last_name}` : 'No teacher',
+                enrollment: c.current_enrollment
+            })),
+            students: students.map(s => ({
+                id: s.id,
+                name: `${s.first_name} ${s.last_name}`,
+                class_id: s.class_id,
+                grade_level: s.grade_level
+            })),
+            timestamp: new Date().toISOString()
+        });
+        
+    } catch (error) {
+        res.status(500).json({ 
+            error: error.message,
+            message: 'Class debug endpoint failed' 
+        });
+    }
+});
+
+// Fix class-teacher and student-class assignments
+app.get('/api/fix-class-assignments', async (req, res) => {
+    try {
+        const { Class, Student, Staff } = require('./models');
+        
+        // Get Sarah Johnson (teacher1's staff record)
+        const teacher1Staff = await Staff.findOne({
+            where: { user_id: '17c45c5d-0888-4335-966f-cf59428983d5' }
+        });
+        
+        if (!teacher1Staff) {
+            return res.status(404).json({ error: 'Teacher1 staff record not found' });
+        }
+        
+        // Get existing classes
+        const classes = await Class.findAll({
+            where: { class_teacher_id: null }
+        });
+        
+        // Assign teacher1 to all classes
+        const classUpdates = classes.map(cls => 
+            cls.update({ class_teacher_id: teacher1Staff.id })
+        );
+        
+        await Promise.all(classUpdates);
+        
+        // Get students without class assignments
+        const unassignedStudents = await Student.findAll({
+            where: { class_id: null },
+            limit: 20
+        });
+        
+        // Assign students to classes
+        let studentUpdates = [];
+        let classIndex = 0;
+        
+        for (let i = 0; i < unassignedStudents.length; i++) {
+            const student = unassignedStudents[i];
+            const targetClass = classes[classIndex % classes.length];
+            
+            studentUpdates.push(
+                student.update({ class_id: targetClass.id })
+            );
+            
+            classIndex++;
+        }
+        
+        await Promise.all(studentUpdates);
+        
+        // Update class enrollment counts
+        const enrollmentUpdates = [];
+        for (const cls of classes) {
+            const studentCount = await Student.count({
+                where: { class_id: cls.id }
+            });
+            enrollmentUpdates.push(
+                cls.update({ current_enrollment: studentCount })
+            );
+        }
+        
+        await Promise.all(enrollmentUpdates);
+        
+        res.json({
+            message: 'Class assignments fixed successfully!',
+            teacher_assigned_to_classes: classes.length,
+            students_assigned: studentUpdates.length,
+            teacher_name: `${teacher1Staff.first_name} ${teacher1Staff.last_name}`,
+            success: true,
+            timestamp: new Date().toISOString()
+        });
+        
+    } catch (error) {
+        res.status(500).json({ 
+            error: error.message,
+            message: 'Fix class assignments failed',
+            success: false
+        });
+    }
+});
+
+// Fix class assignments with proper school and grade matching
+app.get('/api/fix-proper-assignments', async (req, res) => {
+    try {
+        const { Class, Student, Staff, School } = require('./models');
+        
+        // Get Sarah Johnson and her school
+        const teacher1Staff = await Staff.findOne({
+            where: { user_id: '17c45c5d-0888-4335-966f-cf59428983d5' },
+            include: [{ model: School }]
+        });
+        
+        if (!teacher1Staff) {
+            return res.status(404).json({ error: 'Teacher1 staff record not found' });
+        }
+        
+        // First, clear any improper assignments
+        await Student.update(
+            { class_id: null },
+            { where: { class_id: { [require('sequelize').Op.ne]: null } } }
+        );
+        
+        // Get classes that should belong to this teacher
+        const classes = await Class.findAll();
+        
+        // Get students from the same school and appropriate grade levels
+        const schoolStudents = await Student.findAll({
+            where: { 
+                school_id: teacher1Staff.school_id,
+                grade_level: {
+                    [require('sequelize').Op.in]: ['Class 3', 'Class 4'] // Match the class grades
+                }
+            }
+        });
+        
+        console.log(`Found ${schoolStudents.length} students from same school with matching grades`);
+        
+        // If no students from same school/grade, create some demo students for this school
+        let studentsToAssign = schoolStudents;
+        
+        if (schoolStudents.length === 0) {
+            console.log('No matching students found, creating demo students...');
+            
+            const demoStudents = [
+                { first_name: 'Alex', last_name: 'Thompson', grade_level: 'Class 4' },
+                { first_name: 'Maya', last_name: 'Patel', grade_level: 'Class 4' },
+                { first_name: 'Jordan', last_name: 'Williams', grade_level: 'Class 4' },
+                { first_name: 'Sofia', last_name: 'Rodriguez', grade_level: 'Class 3' },
+                { first_name: 'Ethan', last_name: 'Brown', grade_level: 'Class 3' },
+                { first_name: 'Zara', last_name: 'Ahmed', grade_level: 'Class 3' }
+            ];
+            
+            const createdStudents = await Student.bulkCreate(
+                demoStudents.map(student => ({
+                    ...student,
+                    school_id: teacher1Staff.school_id,
+                    student_id: `STU${Date.now()}_${student.first_name}`,
+                    date_of_birth: new Date('2010-01-01'),
+                    enrollment_date: new Date(),
+                    is_active: true
+                }))
+            );
+            
+            studentsToAssign = createdStudents;
+        }
+        
+        // Assign students to appropriate classes based on grade level
+        const assignmentPromises = [];
+        
+        for (const cls of classes) {
+            const matchingStudents = studentsToAssign.filter(student => 
+                student.grade_level === cls.grade_level
+            );
+            
+            // Assign up to 15 students per class
+            const studentsForClass = matchingStudents.slice(0, 15);
+            
+            for (const student of studentsForClass) {
+                assignmentPromises.push(
+                    student.update({ class_id: cls.id })
+                );
+            }
+            
+            // Update class enrollment and assign teacher
+            assignmentPromises.push(
+                cls.update({ 
+                    class_teacher_id: teacher1Staff.id,
+                    current_enrollment: studentsForClass.length
+                })
+            );
+        }
+        
+        await Promise.all(assignmentPromises);
+        
+        res.json({
+            message: 'Proper class assignments completed!',
+            teacher_name: `${teacher1Staff.first_name} ${teacher1Staff.last_name}`,
+            school_name: teacher1Staff.School?.name || 'Unknown School',
+            classes_assigned: classes.length,
+            students_processed: studentsToAssign.length,
+            assignment_method: schoolStudents.length > 0 ? 'existing_students' : 'demo_students_created',
+            success: true,
+            timestamp: new Date().toISOString()
+        });
+        
+    } catch (error) {
+        console.error('Fix assignments error:', error);
+        res.status(500).json({ 
+            error: error.message,
+            message: 'Fix proper assignments failed',
+            success: false
+        });
+    }
+});
 
 // Demo endpoint without authentication (with rate limiting)
 app.get('/api/demo', demoLimiter, (req, res) => {
@@ -493,7 +949,7 @@ app.get('/api/schools/by-parish/:parish', async (req, res, next) => {
         const { page = 1, limit = 20 } = req.query;
         const offset = (page - 1) * limit;
         
-        const validParishes = ['st_michael', 'christ_church', 'st_philip', 'st_james', 'st_john', 'st_andrew', 'st_george', 'st_peter', 'st_lucy'];
+        const validParishes = ['st_michael', 'christ_church', 'st_philip', 'st_james', 'st_john', 'st_andrew', 'st_george', 'st_peter', 'st_lucy', 'st_joseph', 'st_thomas'];
         if (!validParishes.includes(parish)) {
             return res.status(400).json({ 
                 error: 'Invalid parish', 
@@ -532,21 +988,62 @@ app.get('/api/schools/by-parish/:parish', async (req, res, next) => {
 });
 
 // Protected API routes with role-based rate limiting
-app.use('/api/students', authMiddleware, roleBasedLimiter, studentRoutes);
-app.use('/api/admin', authMiddleware, roleBasedLimiter, adminRoutes);
-app.use('/api/admin/schools', authMiddleware, roleBasedLimiter, schoolRoutes);
-app.use('/api/teachers', authMiddleware, roleBasedLimiter, teacherRoutes);
-app.use('/api/attendance', authMiddleware, roleBasedLimiter, attendanceRoutes);
-app.use('/api/facilities', authMiddleware, roleBasedLimiter, facilityRoutes);
-app.use('/api/reports', authMiddleware, roleBasedLimiter, reportRoutes);
-app.use('/api/rfid', authMiddleware, roleBasedLimiter, rfidRoutes);
-app.use('/api/grading', authMiddleware, roleBasedLimiter, gradingRoutes);
+const apiActivityAuditMiddleware = createApiActivityAuditMiddleware({
+    skipPrefixes: ['/api/auth', '/api/health']
+});
+
+app.use('/api/students', authMiddleware, roleBasedLimiter, attachAccessContext, authorizeRouteGroup('students'), apiActivityAuditMiddleware, studentRoutes);
+app.use('/api/admin', authMiddleware, roleBasedLimiter, attachAccessContext, authorizeRouteGroup('admin'), adminRoutes);
+app.use('/api/admin/schools', authMiddleware, roleBasedLimiter, attachAccessContext, authorizeRouteGroup('schools'), schoolRoutes);
+app.use('/api/teachers', authMiddleware, roleBasedLimiter, attachAccessContext, authorizeRouteGroup('teachers'), apiActivityAuditMiddleware, teacherRoutes);
+app.use('/api/attendance', authMiddleware, roleBasedLimiter, attachAccessContext, authorizeRouteGroup('attendance'), apiActivityAuditMiddleware, attendanceRoutes);
+app.use('/api/facilities', authMiddleware, roleBasedLimiter, attachAccessContext, authorizeRouteGroup('facilities'), apiActivityAuditMiddleware, facilityRoutes);
+app.use('/api/reports', authMiddleware, roleBasedLimiter, attachAccessContext, authorizeRouteGroup('reports'), apiActivityAuditMiddleware, reportRoutes);
+app.use('/api/rfid', authMiddleware, roleBasedLimiter, attachAccessContext, authorizeRouteGroup('rfid'), apiActivityAuditMiddleware, rfidRoutes);
+app.use('/api/grading', authMiddleware, roleBasedLimiter, attachAccessContext, authorizeRouteGroup('grading'), apiActivityAuditMiddleware, gradingRoutes);
+app.use('/api/setup', setupRoutes);
 
 // Error handling middleware
 app.use(errorHandler);
 
 // 404 handler
 app.use('*', notFoundHandler);
+
+// Real-time services initialization
+async function initializeRealTimeServices(server) {
+    try {
+        logger.info('Initializing real-time services...');
+        
+        // Connect to Redis
+        await redisManager.connect();
+        logger.info('Redis connection established');
+        
+        // Initialize WebSocket service
+        await socketService.initialize(server);
+        logger.info('WebSocket service initialized');
+        
+        // Add health check endpoint for real-time services
+        app.get('/api/health/realtime', async (req, res) => {
+            const redisHealth = await redisManager.healthCheck();
+            const socketStats = {
+                connectedUsers: socketService.getConnectedUserCount(),
+                status: 'healthy'
+            };
+            
+            res.json({
+                redis: redisHealth,
+                websocket: socketStats,
+                timestamp: new Date().toISOString()
+            });
+        });
+        
+        logger.info('Real-time services initialized successfully');
+        
+    } catch (error) {
+        logger.error('Failed to initialize real-time services:', error);
+        logger.warn('Continuing without real-time features...');
+    }
+}
 
 // Database connection and server startup
 async function connectToDatabase(retries = 3) {
@@ -568,6 +1065,36 @@ async function connectToDatabase(retries = 3) {
     return false;
 }
 
+async function ensureTimetableSchema() {
+    try {
+        const queryInterface = sequelize.getQueryInterface();
+        const defaultSchema = sequelize.options?.define?.schema;
+        const schoolsTableRef =
+            sequelize.getDialect() === 'postgres'
+                ? { tableName: 'schools', schema: defaultSchema }
+                : 'schools';
+
+        const schoolColumns = await queryInterface.describeTable(schoolsTableRef);
+
+        if (!schoolColumns.offers_sixth_form) {
+            await queryInterface.addColumn(schoolsTableRef, 'offers_sixth_form', {
+                type: Sequelize.BOOLEAN,
+                allowNull: false,
+                defaultValue: false
+            });
+            logger.info('Added schools.offers_sixth_form column');
+        }
+
+        await SchoolDayPolicy.sync({ alter: false });
+        await ClassTimetableSlot.sync({ alter: false });
+        await GradingPolicy.sync({ alter: false });
+        await DataQualityIssue.sync({ alter: false });
+        await DataQualitySnapshot.sync({ alter: false });
+    } catch (error) {
+        logger.warn('Schema check for timetable features failed:', error.message);
+    }
+}
+
 async function startServer() {
     try {
         // Try to connect to database with retries
@@ -577,7 +1104,11 @@ async function startServer() {
             logger.error('Could not establish database connection after multiple attempts');
             logger.info('Starting server without database connection for debugging...');
         }
-        
+
+        if (dbConnected) {
+            await ensureTimetableSchema();
+        }
+
         // Sync database in development if connection is established
         if (dbConnected && process.env.NODE_ENV === 'development') {
             try {
@@ -597,11 +1128,14 @@ async function startServer() {
         
         if (httpsServer && !httpsForceDisabled) {
             const httpsPort = process.env.HTTPS_PORT || 443;
-            httpsServer.listen(httpsPort, () => {
+            httpsServer.listen(httpsPort, async () => {
                 logger.info(`NiEMIS Backend HTTPS Server running on port ${httpsPort}`);
                 logger.info(`Environment: ${process.env.NODE_ENV}`);
                 logger.info(`Database status: ${dbConnected ? 'Connected' : 'Disconnected'}`);
                 logger.info('SSL/TLS encryption enabled');
+
+                // Initialize real-time services
+                await initializeRealTimeServices(httpsServer);
             });
             
             // Start HTTP server for redirects (if not on Render.com)
@@ -612,13 +1146,16 @@ async function startServer() {
             }
         } else {
             // Fallback to HTTP server
-            app.listen(PORT, () => {
+            const server = app.listen(PORT, async () => {
                 logger.info(`NiEMIS Backend Server running on port ${PORT}`);
                 logger.info(`Environment: ${process.env.NODE_ENV}`);
                 logger.info(`Database status: ${dbConnected ? 'Connected' : 'Disconnected'}`);
                 if (isProduction) {
                     logger.warn('Running HTTP server in production - SSL certificates not found');
                 }
+
+                // Initialize real-time services
+                await initializeRealTimeServices(server);
             });
         }
         
@@ -633,6 +1170,13 @@ const gracefulShutdown = async (signal) => {
     logger.info(`${signal} received, shutting down gracefully`);
     
     try {
+        // Close real-time services
+        await socketService.shutdown();
+        logger.info('WebSocket service closed');
+        
+        await redisManager.disconnect();
+        logger.info('Redis connection closed');
+        
         // Close database connections
         await sequelize.close();
         logger.info('Database connections closed');
@@ -659,6 +1203,9 @@ process.on('unhandledRejection', (reason, promise) => {
     process.exit(1);
 });
 
-startServer();
+if (require.main === module) {
+    startServer();
+}
 
 module.exports = app;
+module.exports.startServer = startServer;

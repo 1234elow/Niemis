@@ -178,7 +178,7 @@ describe('Database Connection Tests', () => {
             const parishCount = await Parish.count();
             
             expect(schoolCount).toBeGreaterThanOrEqual(100); // At least 100 schools (tolerance for 106)
-            expect(zoneCount).toEqual(5); // Exactly 5 zones
+            expect(zoneCount).toEqual(3); // Exactly 3 zones
             expect(parishCount).toEqual(11); // Exactly 11 parishes
         });
 

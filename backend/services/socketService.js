@@ -512,11 +512,17 @@ class SocketService {
     }
 
     async broadcastToRole(role, event, data) {
+        if (!this.io) {
+            return;
+        }
         const roomName = `${role}_room`;
         this.io.to(roomName).emit(event, data);
     }
 
     async broadcastToSchool(schoolId, event, data) {
+        if (!this.io) {
+            return;
+        }
         const roomName = `school_${schoolId}`;
         this.io.to(roomName).emit(event, data);
     }

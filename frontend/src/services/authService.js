@@ -2,15 +2,23 @@ import axios from "axios";
 
 // Determine API URL based on environment
 const getApiUrl = () => {
-  // Vercel environment detection
-  if (import.meta.env.VITE_VERCEL_ENV) {
-    return (
-      import.meta.env.VITE_API_URL || "https://niemis-backend.onrender.com/api"
-    );
+  // Explicit override always wins.
+  if (import.meta.env.VITE_API_URL) {
+    return import.meta.env.VITE_API_URL;
   }
 
-  // Development/other environments
-  return import.meta.env.VITE_API_URL || "http://localhost:5000/api";
+  // In local development, use Vite proxy to avoid browser CORS preflight blocks.
+  if (import.meta.env.DEV) {
+    return "/api";
+  }
+
+  // Hosted fallback
+  if (import.meta.env.VITE_VERCEL_ENV) {
+    return "https://niemis-backend.onrender.com/api";
+  }
+
+  // Default same-origin fallback for production-like environments.
+  return "/api";
 };
 
 const API_URL = getApiUrl();

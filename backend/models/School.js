@@ -40,6 +40,12 @@ module.exports = (sequelize, DataTypes) => {
             },
             comment: 'Current total student enrollment'
         },
+        offers_sixth_form: {
+            type: DataTypes.BOOLEAN,
+            allowNull: false,
+            defaultValue: false,
+            comment: 'Whether this secondary school offers Lower/Upper Sixth classes'
+        },
         zone_id: {
             type: DataTypes.UUID,
             references: {
@@ -102,6 +108,7 @@ module.exports = (sequelize, DataTypes) => {
             { fields: ['school_category'] },
             { fields: ['parish'] },
             { fields: ['school_code'] },
+            { fields: ['offers_sixth_form'] },
             { fields: ['zone_id'] },
             { fields: ['parish_id'] },
             { fields: ['is_active'] },

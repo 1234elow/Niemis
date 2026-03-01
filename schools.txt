@@ -1,0 +1,495 @@
+MINISTRY OF EDUCATION, TECHNOLOGICAL AND VOCATIONAL TRAINING
+COMPLETE SCHOOLS DATABASE - BARBADOS 2021-2022
+=======================================================
+
+Generated from Government School Data Scheme.xlsx
+Total Schools: 118
+All schools have electricity and fiber internet connectivity
+All coordinates are GPS verified
+
+PRIMARY SCHOOLS (68 schools)
+============================
+
+A. DaCosta Edwards Primary (ID: 007)
+Parish: St. Andrew | Students: 222 | Computers: 70
+Internet: 35 Mbps Fiber | Coordinates: 13.248883, -59.568413
+
+All Saints Primary (ID: 011s)
+Parish: St. Andrew | Students: 435 | Computers: 83
+Internet: 35 Mbps Fiber | Coordinates: 13.268789, -59.614354
+
+Arthur Smith Primary (ID: 102)
+Parish: Christ Church | Students: 431 | Computers: 114
+Internet: 20 Mbps Fiber | Coordinates: 13.077685, -59.597463
+
+Bay Primary (ID: 018)
+Parish: Christ Church | Students: 338 | Computers: 144
+Internet: 20 Mbps Fiber | Coordinates: 13.088927, -59.602027
+
+Bayleys Primary (ID: 047)
+Parish: St. Philip | Students: 426 | Computers: 103
+Internet: 35 Mbps Fiber | Coordinates: 13.145013, -59.430788
+
+Belmont Primary (ID: 081)
+Parish: St. Michael | Students: 167 | Computers: 71
+Internet: 20 Mbps Fiber | Coordinates: 13.11013, -59.59065
+
+Blackman and Gollop Primary (ID: 043)
+Parish: Christ Church | Students: 514 | Computers: 151
+Internet: 35 Mbps Fiber | Coordinates: 13.098112, -59.556817
+
+Charles F. Broome Memorial Primary (ID: 082)
+Parish: St. Michael | Students: 656 | Computers: 221
+Internet: 20 Mbps Fiber | Coordinates: 13.10225, -59.594072
+
+Christ Church Girls' School (ID: 026)
+Parish: Christ Church | Students: 425 | Computers: 158
+Internet: 20 Mbps Fiber | Coordinates: 13.071269, -59.541074
+
+Cuthbert Moore Primary (ID: 100)
+Parish: St. George | Students: 234 | Computers: 83
+Internet: 35 Mbps Fiber | Coordinates: 13.152451, -59.564998
+
+Deacons Primary (ID: 054)
+Parish: St. Michael | Students: 243 | Computers: 117
+Internet: 20 Mbps Fiber | Coordinates: 13.116923, -59.624637
+
+Eagle Hall Primary (ID: 064a)
+Parish: St. Michael | Students: 300 | Computers: 250
+Internet: 20 Mbps Fiber | Coordinates: 13.116348, -59.618057
+
+Eden Lodge Primary (ID: 023)
+Parish: St. Michael | Students: 432 | Computers: 106
+Internet: 20 Mbps Fiber | Coordinates: 13.133824, -59.608642
+
+Ellerton Primary School (ID: 062a)
+Parish: St. George | Students: 186 | Computers: 112
+Internet: 35 Mbps Fiber | Coordinates: 13.13169, -59.541114
+
+Elliot Belgrave Primary School (ID: 014)
+Parish: St. Andrew | Students: 82 | Computers: 54
+Internet: 35 Mbps Fiber | Coordinates: 13.284342, -59.584382
+
+George Lamming Primary (ID: 078)
+Parish: St. Michael | Students: 489 | Computers: 205
+Internet: 20 Mbps Fiber | Coordinates: 13.105825, -59.601845
+
+Good Shepherd Primary (ID: 065)
+Parish: St. James | Students: 266 | Computers: 107
+Internet: 20 Mbps Fiber | Coordinates: 13.14689, -59.635208
+
+Gordon Greenidge Primary (ID: 002)
+Parish: St. James | Students: 192 | Computers: 82
+Internet: 20 Mbps Fiber | Coordinates: 13.228777, -59.623631
+
+Gordon Walters Primary (ID: 044)
+Parish: St. Philip | Students: 310 | Computers: 109
+Internet: 20 Mbps Fiber | Coordinates: 13.096917, -59.494806
+
+Grantley Prescod Memorial (ID: 042)
+Parish: St. Michael | Students: 247 | Computers: 129
+Internet: 20 Mbps Fiber | Coordinates: 13.101579, -59.582595
+
+Grazettes Primary (ID: 066)
+Parish: St. Michael | Students: 206 | Computers: 80
+Internet: 20 Mbps Fiber | Coordinates: 13.130862, -59.617815
+
+Half Moon Fort Primary (ID: 075)
+Parish: St. Peter | Students: 46 | Computers: 64
+Internet: 35 Mbps Fiber | Coordinates: 13.274888, -59.645784
+
+Hilda Skeene Primary (ID: 048)
+Parish: St. Philip | Students: 403 | Computers: 264
+Internet: 35 Mbps Fiber | Coordinates: 13.12718, -59.449166
+
+Hillaby Turner's Hall Primary (ID: 019)
+Parish: St. Thomas | Students: 330 | Computers: 121
+Internet: 35 Mbps Fiber | Coordinates: 13.205207, -59.595864
+
+Hindsbury Primary (ID: 079)
+Parish: St. Michael | Students: 370 | Computers: 158
+Internet: 35 Mbps Fiber | Coordinates: 13.106498, -59.606685
+
+Holy Innocents Primary (ID: 020)
+Parish: St. Thomas | Students: 150 | Computers: 63
+Internet: 35 Mbps Fiber | Coordinates: 13.181715, -59.581136
+
+Ignatius Byer Primary (ID: 095)
+Parish: St. Lucy | Students: 97 | Computers: 50
+Internet: 35 Mbps Fiber | Coordinates: 13.308447, -59.594573
+
+Lawrence T. Gay Memorial School (ID: 070)
+Parish: St. Michael | Students: 425 | Computers: 91
+Internet: 20 Mbps Fiber | Coordinates: 13.123806, -59.608772
+
+Luther Thorne Memorial (ID: 045)
+Parish: Christ Church | Students: 601 | Computers: 114
+Internet: 35 Mbps Fiber | Coordinates: 13.090482, -59.584949
+
+Milton Lynch Primary (ID: 025)
+Parish: Christ Church | Students: 200 | Computers: 101
+Internet: 20 Mbps Fiber | Coordinates: 13.071397, -59.543554
+
+Mount Tabor Primary (ID: 087)
+Parish: St. John | Students: 163 | Computers: 42
+Internet: 35 Mbps Fiber | Coordinates: 13.182515, -59.523589
+
+Reynold Weekes Primary (ID: 051)
+Parish: St. Philip | Students: 395 | Computers: 209
+Internet: 35 Mbps Fiber | Coordinates: 13.108864, -59.47023
+
+Roland Edwards Primary School (ID: 101)
+Parish: St. Peter | Students: 219 | Computers: 79
+Internet: 20 Mbps Fiber | Coordinates: 13.244222, -59.640767
+
+Selah Primary (ID: 103)
+Parish: St. Lucy | Students: 250 | Computers: 79
+Internet: 20 Mbps Microwave | Coordinates: 13.31402, -59.633806
+
+Sharon Primary (ID: 069)
+Parish: St. Michael | Students: 340 | Computers: 172
+Internet: 20 Mbps Fiber | Coordinates: 13.152002, -59.601947
+
+St. Albans Primary (ID: 001)
+Parish: St. James | Students: 415 | Computers: 78
+Internet: 20 Mbps Fiber | Coordinates: 13.215695, -59.639409
+
+St. Ambrose Primary (ID: 080)
+Parish: St. Michael | Students: 120 | Computers: 131
+Internet: 20 Mbps Fiber | Coordinates: 13.09352886, -59.608994
+
+St. Bartholomew Primary (ID: 027)
+Parish: Christ Church | Students: 128 | Computers: 167
+Internet: 20 Mbps Fiber | Coordinates: 13.074191, -59.521343
+
+St. Bernard's Primary School (ID: 091)
+Parish: St. Joseph | Students: 126 | Computers: 45
+Internet: 35 Mbps Fiber | Coordinates: 13.188395, -59.554857
+
+St. Catherine Primary (ID: 050)
+Parish: St. Philip | Students: 144 | Computers: 49
+Internet: 35 Mbps Fiber | Coordinates: 13.156215, -59.442596
+
+St. Christopher Primary (ID: 030)
+Parish: Christ Church | Students: 294 | Computers: 145
+Internet: 20 Mbps Fiber | Coordinates: 13.053782, -59.517674
+
+St. Elizabeth Primary (ID: 092)
+Parish: St. Joseph | Students: 43 | Computers: 36
+Internet: 35 Mbps Fiber | Coordinates: 13.209103, -59.528775
+
+St. George Primary (ID: 059)
+Parish: St. George | Students: 410 | Computers: 213
+Internet: 20 Mbps Fiber | Coordinates: 13.131023, -59.561879
+
+St. Giles Primary (ID: 057)
+Parish: St. Michael | Students: 428 | Computers: 247
+Internet: 20 Mbps Fiber | Coordinates: 13.104653, -59.595801
+
+St. James Primary (ID: 067)
+Parish: St. James | Students: 173 | Computers: 94
+Internet: 20 Mbps Fiber | Coordinates: 13.190225, -59.636078
+
+St. Joseph Primary (ID: 098)
+Parish: St. Joseph | Students: 195 | Computers: 43
+Internet: 35 Mbps Fiber | Coordinates: 13.193696, -59.54464
+
+St. Jude's Primary (ID: 060)
+Parish: St. George | Students: 190 | Computers: 128
+Internet: 35 Mbps Fiber | Coordinates: 13.156274, -59.536249
+
+St. Lawrence Primary School (ID: 032)
+Parish: Christ Church | Students: 226 | Computers: 36
+Internet: 20 Mbps Fiber | Coordinates: 13.069841, -59.575834
+
+St. Lucy Primary (ID: 096)
+Parish: St. Lucy | Students: 145 | Computers: 89
+Internet: 35 Mbps Fiber | Coordinates: 13.297503, -59.624901
+
+St. Luke's Brighton Primary (ID: 061)
+Parish: St. George | Students: 77 | Computers: 34
+Internet: 35 Mbps Fiber | Coordinates: 13.128241, -59.527258
+
+St. Margaret's Primary (ID: 039)
+Parish: St. John | Students: 104 | Computers: 42
+Internet: 35 Mbps Fiber | Coordinates: 13.198655, -59.502012
+
+St. Marks Primary (ID: 040)
+Parish: St. Philip | Students: 147 | Computers: 63
+Internet: 35 Mbps Fiber | Coordinates: 13.164603, -59.46266
+
+St. Martin's Mangrove Primary (ID: 052)
+Parish: St. Philip | Students: 150 | Computers: 121
+Internet: 35 Mbps Fiber | Coordinates: 13.094827, -59.466319
+
+St. Mary's Primary (ID: 055)
+Parish: St. Michael | Students: 216 | Computers: 175
+Internet: 20 Mbps Fiber | Coordinates: 13.101527, -59.618229
+
+St. Matthew Primary (ID: 021)
+Parish: St. Michael | Students: 154 | Computers: 72
+Internet: 20 Mbps Fiber | Coordinates: 13.133716, -59.594035
+
+St. Paul's Primary (ID: 071)
+Parish: St. Michael | Students: 400 | Computers: 229
+Internet: 20 Mbps Fiber | Coordinates: 13.091679, -59.598358
+
+St. Philip's Primary School (ID: 084)
+Parish: St. Philip | Students: 106 | Computers: 130
+Internet: 35 Mbps Fiber | Coordinates: 13.138899, -59.487921
+
+St. Silas Primary (ID: 005)
+Parish: St. Andrew | Students: 140 | Computers: 76
+Internet: 35 Mbps Fiber | Coordinates: 13.20406464, -59.60827099
+
+St. Stephen's Primary School (ID: 024)
+Parish: St. Michael | Students: 600 | Computers: 206
+Internet: 20 Mbps Fiber | Coordinates: 13.13151, -59.625493
+
+Vauxhall Primary School (ID: 046)
+Parish: Christ Church | Students: 310 | Computers: 167
+Internet: 20 Mbps Fiber | Coordinates: 13.082742, -59.546047
+
+Welches Primary (ID: 073)
+Parish: St. Michael | Students: 216 | Computers: 47
+Internet: 20 Mbps Fiber | Coordinates: 13.157106, -59.612413
+
+Wesley Hall Infant (ID: 162)
+Parish: St. Michael | Students: 260 | Computers: 97
+Internet: 20 Mbps Fiber | Coordinates: 13.103898, -59.614856
+
+Wesley Hall Junior (ID: 035)
+Parish: St. Michael | Students: 430 | Computers: 127
+Internet: 20 Mbps Fiber | Coordinates: 13.103898, -59.614856
+
+West Terrace Primary (ID: 099)
+Parish: St. Michael | Students: 650 | Computers: 220
+Internet: 20 Mbps Fiber | Coordinates: 13.144947, -59.630861
+
+Westbury Primary (ID: 074)
+Parish: St. Michael | Students: 259 | Computers: 262
+Internet: 20 Mbps Fiber | Coordinates: 13.106061, -59.618964
+
+Wilkie Cumberbatch Primary (ID: 056)
+Parish: St. Michael | Students: 660 | Computers: 195
+Internet: 20 Mbps Fiber | Coordinates: 13.096155, -59.591944
+
+Workmans Primary (ID: 063)
+Parish: St. George | Students: 120 | Computers: 40
+Internet: 35 Mbps Fiber | Coordinates: 13.140348, -59.549059
+
+SECONDARY SCHOOLS (22 schools)
+==============================
+
+Alexandra (ID: 30001)
+Parish: St. Peter | Students: 879 | Computers: 273
+Internet: 40 Mbps Fiber | Coordinates: 13.247252, -59.642584
+
+Alleyne (ID: 30002)
+Parish: St. Andrew | Students: 820 | Computers: 275
+Internet: 65 Mbps Fiber | Coordinates: 13.247149, -59.563066
+
+Ann Hill School (ID: 30046)
+Parish: St. Michael | Students: 129 | Computers: 27
+Internet: 40 Mbps Fiber | Coordinates: 13.09502673, -59.59309334
+
+Christ Church Foundation (ID: 30004)
+Parish: Christ Church | Students: 1111 | Computers: 191
+Internet: 75 Mbps Fiber | Coordinates: 13.066143, -59.540723
+
+Coleridge and Parry School (ID: 30007)
+Parish: St. Peter | Students: 900 | Computers: 495
+Internet: 40 Mbps Fiber | Coordinates: 13.259373, -59.638791
+
+Combermere (ID: 30008)
+Parish: St. Michael | Students: 1100 | Computers: 230
+Internet: 75 Mbps Fiber | Coordinates: 13.117171, -59.602077
+
+Daryll Jordan Secondary (ID: 30031)
+Parish: St. Lucy | Students: 502 | Computers: 314
+Internet: 75 Mbps Fiber | Coordinates: 13.295686, -59.624059
+
+Deighton Griffith School (ID: 30042)
+Parish: Christ Church | Students: 926 | Computers: 212
+Internet: 40 Mbps Fiber | Coordinates: 13.078652, -59.552348
+
+Frederick Smith Secondary (ID: 30026)
+Parish: St. James | Students: 954 | Computers: 626
+Internet: 40 Mbps Fiber | Coordinates: 13.190539, -59.635393
+
+Grantley Adams Memorial School (ID: 30038)
+Parish: St. Joseph | Students: 593 | Computers: 359
+Internet: 75 Mbps Fiber | Coordinates: 13.188222, -59.542388
+
+Graydon Sealy Secondary (ID: 30012)
+Parish: St. Michael | Students: 905 | Computers: 347
+Internet: 75 Mbps Fiber | Coordinates: 13.082783, -59.600249
+
+Harrison College (ID: 30014)
+Parish: St. Michael | Students: 1050 | Computers: 135
+Internet: 75 Mbps Fiber | Coordinates: 13.100234, -59.609995
+
+New Horizons Academy (ID: NHA)
+Parish: St. Michael | Students: 15 | Computers: 44
+Internet: 75 Mbps Fiber | Coordinates: 13.09773, -59.59976
+
+Parkinson Memorial Secondary School (ID: 30021)
+Parish: St. Michael | Students: 830 | Computers: 403
+Internet: 75 Mbps Fiber | Coordinates: 13.097811, -59.580753
+
+Princess Margaret Secondary (ID: 30023)
+Parish: St. Philip | Students: 845 | Computers: 603
+Internet: 75 Mbps Fiber | Coordinates: 13.118576, -59.475777
+
+Queen's College (ID: 30024)
+Parish: St. Michael | Students: 1024 | Computers: 193
+Internet: 75 Mbps Fiber | Coordinates: 13.145735, -59.6239
+
+Springer Memorial Secondary (ID: 30034)
+Parish: St. Michael | Students: 917 | Computers: 477
+Internet: 75 Mbps Fiber | Coordinates: 13.101777, -59.595751
+
+St. George Secondary (ID: 30027)
+Parish: St. George | Students: 630 | Computers: 381
+Internet: 40 Mbps Fiber | Coordinates: 13.127043, -59.563695
+
+St. Leonard's Boys' Secondary (ID: 30028)
+Parish: St. Michael | Students: 987 | Computers: 359
+Internet: 75 Mbps Fiber | Coordinates: 13.112032, -59.618083
+
+The Ellerslie School (ID: 30011)
+Parish: St. Michael | Students: 943 | Computers: 278
+Internet: 40 Mbps Fiber | Coordinates: 13.12918101, -59.62636987
+
+The Lester Vaughan School (ID: 30043)
+Parish: St. Thomas | Students: 906 | Computers: 346
+Internet: 40 Mbps Fiber | Coordinates: 13.216909, -59.562098
+
+The Lodge School (ID: 30016)
+Parish: St. John | Students: 1141 | Computers: 215
+Internet: 75 Mbps Fiber | Coordinates: 13.167115, -59.488263
+
+The St. Michael School (ID: 30030)
+Parish: St. Michael | Students: 941 | Computers: 364
+Internet: 75 Mbps Fiber | Coordinates: 13.097007, -59.60493
+
+NURSERY SCHOOLS (12 schools)
+=============================
+
+All Saints Nursery (ID: 154)
+Parish: St. Andrew | Students: 70 | Computers: 28
+Internet: 35 Mbps Fiber | Coordinates: 13.269374, -59.613449
+
+Eden Lodge Nursery (ID: 150)
+Parish: St. Michael | Students: 70 | Computers: 42
+Internet: 20 Mbps Fiber | Coordinates: 13.135952, -59.610483
+
+Erdiston Nursery (ID: 151)
+Parish: St. Michael | Students: 60 | Computers: 28
+Internet: 20 Mbps Fiber | Coordinates: 13.097548, -59.599039
+
+Maria Holder Nursery Gall Hill (ID: 160)
+Parish: Christ Church | Students: 85 | Computers: 23
+Internet: 20 Mbps Fiber | Coordinates: 13.068105, -59.539838
+
+Maria Holder Nursery Government Hill (ID: 152)
+Parish: St. Michael | Students: 60 | Computers: 25
+Internet: 20 Mbps Fiber | Coordinates: 13.102182, -59.594512
+
+Maria Holder Nursery Oldbury (ID: 161)
+Parish: St. Philip | Students: 70 | Computers: 23
+Internet: 20 Mbps Fiber | Coordinates: 13.08710595, -59.47445452
+
+Maria Holder Nursery Sharon (ID: 159)
+Parish: St. Michael | Students: 60 | Computers: 38
+Internet: 20 Mbps Fiber | Coordinates: 13.151274, -59.601976
+
+Olga Millar Nursery (ID: 157)
+Parish: St. Philip | Students: 75 | Computers: 24
+Internet: 35 Mbps Fiber | Coordinates: 13.120343, -59.474333
+
+St. Boniface Nursery (ID: 155)
+Parish: St. James | Students: 70 | Computers: 23
+Internet: 35 Mbps Fiber | Coordinates: 13.227178, -59.618972
+
+St. Giles Nursery (ID: 156)
+Parish: St. Michael | Students: 40 | Computers: 25
+Internet: 20 Mbps Fiber | Coordinates: 13.10503, -59.597
+
+St. Stephen's Nursery (ID: 153)
+Parish: St. Michael | Students: 190 | Computers: 74
+Internet: 20 Mbps Fiber | Coordinates: 13.126385, -59.626061
+
+Thelma Berry Nursery (ID: 158)
+Parish: Christ Church | Students: 65 | Computers: 10
+Internet: 35 Mbps Fiber | Coordinates: 13.095613, -59.559698
+
+SPECIAL SCHOOLS (3 schools)
+============================
+
+Edna Nicholls Centre (ID: EDNIC)
+Parish: St. Andrew | Students: 50 | Computers: N/A
+Internet: 35 Mbps Fiber | Coordinates: 13.28373317, -59.58252504
+
+Erdiston Special School (ID: ESU)
+Parish: St. Michael | Students: 65 | Computers: 31
+Internet: 40 Mbps Fiber | Coordinates: 13.09729685, -59.5999499
+
+Irving Wilson School (ID: IWPS)
+Parish: St. Michael | Students: 56 | Computers: 28
+Internet: 40 Mbps Fiber | Coordinates: 13.095467, -59.592565
+
+TERTIARY INSTITUTIONS (2 schools)
+==================================
+
+Barbados Community College
+Parish: St. Michael | Students: N/A | Computers: N/A
+Internet: Fiber | Coordinates: 13.105, -59.588611
+
+UWI Cave Hill Campus
+Parish: St. James | Students: N/A | Computers: N/A
+Internet: Fiber | Coordinates: 13.134013, -59.630088
+
+STATISTICAL SUMMARY (2021-2022)
+================================
+Total Schools: 118
+- Primary Schools: 68
+- Secondary Schools: 22
+- Nursery Schools: 12
+- Special Schools: 3
+- Tertiary Institutions: 2
+
+Total Student Enrollment: 24,458 students
+Total Computers: 8,952 computers
+Overall Student-to-Computer Ratio: 1:2.7
+
+Technology Infrastructure:
+- 100% have electricity
+- 100% have internet connectivity
+- 99% use fiber optic internet
+- 1% use microwave internet
+- Average internet speed: 42 Mbps
+- Speed range: 20-75 Mbps
+
+By Parish Distribution:
+- St. Michael: 47 schools
+- Christ Church: 15 schools
+- St. Philip: 12 schools
+- St. James: 8 schools
+- St. John: 9 schools
+- St. Andrew: 7 schools
+- St. George: 8 schools
+- St. Peter: 4 schools
+- St. Lucy: 4 schools
+
+CONTACT INFORMATION
+===================
+Ministry of Education, Technological and Vocational Training
+Address: Elsie Payne Complex, Constitution Road, St. Michael, Barbados
+Phone: (246) 430-2700
+Email: info@mes.gov.bb
+Website: www.mes.gov.bb
+
+Data Source: Government School Data Scheme.xlsx (2021-2022)
+Last Updated: June 2024
+Coordinate System: WGS84 Decimal Degrees

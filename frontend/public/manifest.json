@@ -1,0 +1,147 @@
+{
+  "name": "NiEMIS - National Integrated Education Management Information System",
+  "short_name": "NiEMIS",
+  "description": "Comprehensive education management platform for Barbados supporting 106 schools across pre-primary, primary, and secondary education levels",
+  "start_url": "/",
+  "display": "standalone",
+  "theme_color": "#1976d2",
+  "background_color": "#ffffff",
+  "orientation": "portrait-primary",
+  "scope": "/",
+  "lang": "en",
+  "dir": "ltr",
+  "categories": ["education", "productivity", "business"],
+  "screenshots": [
+    {
+      "src": "/images/screenshot-desktop.png",
+      "sizes": "1280x720",
+      "type": "image/png",
+      "form_factor": "wide",
+      "label": "NiEMIS Dashboard on Desktop"
+    },
+    {
+      "src": "/images/screenshot-mobile.png", 
+      "sizes": "375x667",
+      "type": "image/png",
+      "form_factor": "narrow",
+      "label": "NiEMIS Mobile Interface"
+    }
+  ],
+  "icons": [
+    {
+      "src": "/images/icon-72x72.png",
+      "sizes": "72x72",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/images/icon-96x96.png",
+      "sizes": "96x96",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/images/icon-128x128.png",
+      "sizes": "128x128",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/images/icon-144x144.png",
+      "sizes": "144x144",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/images/icon-152x152.png",
+      "sizes": "152x152",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/images/icon-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/images/icon-384x384.png",
+      "sizes": "384x384",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/images/icon-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Student Dashboard",
+      "short_name": "Student",
+      "description": "Access student dashboard and academic information",
+      "url": "/student/profile",
+      "icons": [
+        {
+          "src": "/images/shortcut-student.png",
+          "sizes": "96x96",
+          "type": "image/png"
+        }
+      ]
+    },
+    {
+      "name": "Schools Directory",
+      "short_name": "Schools",
+      "description": "Browse all 106 schools in Barbados",
+      "url": "/schools",
+      "icons": [
+        {
+          "src": "/images/shortcut-schools.png",
+          "sizes": "96x96", 
+          "type": "image/png"
+        }
+      ]
+    },
+    {
+      "name": "Attendance Tracking",
+      "short_name": "Attendance",
+      "description": "RFID-based attendance monitoring",
+      "url": "/attendance",
+      "icons": [
+        {
+          "src": "/images/shortcut-attendance.png",
+          "sizes": "96x96",
+          "type": "image/png"
+        }
+      ]
+    },
+    {
+      "name": "Reports & Analytics",
+      "short_name": "Reports",
+      "description": "Educational performance analytics",
+      "url": "/reports",
+      "icons": [
+        {
+          "src": "/images/shortcut-reports.png",
+          "sizes": "96x96",
+          "type": "image/png"
+        }
+      ]
+    }
+  ],
+  "related_applications": [
+    {
+      "platform": "webapp",
+      "url": "https://niemis.vercel.app/manifest.json"
+    }
+  ],
+  "prefer_related_applications": false,
+  "edge_side_panel": {
+    "preferred_width": 400
+  },
+  "launch_handler": {
+    "client_mode": "navigate-existing"
+  }
+}

@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Database Migration Tool - NiEMIS</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            max-width: 1000px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #1976d2;
+            margin-bottom: 20px;
+        }
+        .section {
+            margin: 20px 0;
+            padding: 20px;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+        }
+        button {
+            background: #1976d2;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+            font-size: 14px;
+        }
+        button:hover {
+            background: #1565c0;
+        }
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        .success {
+            background: #4caf50;
+        }
+        .error {
+            background: #f44336;
+        }
+        .warning {
+            background: #ff9800;
+        }
+        pre {
+            background: #f5f5f5;
+            padding: 15px;
+            border-radius: 5px;
+            overflow-x: auto;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        .status {
+            margin: 10px 0;
+            padding: 10px;
+            border-radius: 5px;
+        }
+        .loading {
+            background: #e3f2fd;
+            border-left: 4px solid #1976d2;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔧 NiEMIS Database Migration Tool</h1>
+        <p>Use this tool to check database status and migrate the grading system from E/G/S/N to A/B/C/D/F with plus/minus modifiers.</p>
+        
+        <div class="section">
+            <h3>📊 Database Status Check</h3>
+            <button onclick="checkSubjectsTerms()">Check Subjects & Terms</button>
+            <button onclick="checkAttendanceTable()">Check Attendance Table</button>
+            <button onclick="checkGradesTable()">Check Grades Table</button>
+            <div id="statusOutput"></div>
+        </div>
+        
+        <div class="section">
+            <h3>🔄 Grade System Migration</h3>
+            <p><strong>Important:</strong> This will convert existing E/G/S/N grades to A/B/C/D/F system.</p>
+            <button onclick="migrateGradingSystem()" class="warning">Migrate to A-F Grading System</button>
+            <div id="migrationOutput"></div>
+        </div>
+        
+        <div class="section">
+            <h3>📝 Migration Status</h3>
+            <div id="overallStatus">Ready to check database status...</div>
+        </div>
+    </div>
+
+    <script>
+        // Try different possible backend ports
+        const POSSIBLE_PORTS = [5000, 3001, 8000, 3000];
+        let API_BASE = 'http://localhost:5000/api';
+        
+        function setStatus(elementId, message, type = '') {
+            const element = document.getElementById(elementId);
+            element.innerHTML = `<div class="status ${type}">${message}</div>`;
+        }
+        
+        function setLoading(elementId, message) {
+            setStatus(elementId, `⏳ ${message}`, 'loading');
+        }
+        
+        async function findWorkingPort() {
+            for (const port of POSSIBLE_PORTS) {
+                try {
+                    const testUrl = `http://localhost:${port}/api/setup/subjects-terms-status`;
+                    const response = await fetch(testUrl, { method: 'GET' });
+                    if (response.ok) {
+                        API_BASE = `http://localhost:${port}/api`;
+                        console.log(`Found working API at port ${port}`);
+                        return true;
+                    }
+                } catch (error) {
+                    // Try next port
+                }
+            }
+            return false;
+        }
+        
+        async function apiCall(endpoint, method = 'GET') {
+            try {
+                const response = await fetch(`${API_BASE}${endpoint}`, {
+                    method: method,
+                    headers: {
+                        'Content-Type': 'application/json',
+                    }
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+                
+                return await response.json();
+            } catch (error) {
+                // If initial call fails, try to find working port
+                if (error.message.includes('fetch')) {
+                    const found = await findWorkingPort();
+                    if (found) {
+                        // Retry with new port
+                        const response = await fetch(`${API_BASE}${endpoint}`, {
+                            method: method,
+                            headers: {
+                                'Content-Type': 'application/json',
+                            }
+                        });
+                        
+                        if (!response.ok) {
+                            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                        }
+                        
+                        return await response.json();
+                    }
+                }
+                
+                console.error('API Error:', error);
+                throw error;
+            }
+        }
+        
+        async function checkSubjectsTerms() {
+            setLoading('statusOutput', 'Checking subjects and terms...');
+            try {
+                const result = await apiCall('/setup/subjects-terms-status');
+                const output = `
+                    <h4>✅ Subjects & Terms Status</h4>
+                    <p><strong>Subjects:</strong> ${result.subjects_count} found</p>
+                    <p><strong>Terms:</strong> ${result.terms_count} found</p>
+                    <p><strong>Current Term:</strong> ${result.current_term ? result.current_term.name + ' ' + result.current_term.school_year : 'None'}</p>
+                    <details>
+                        <summary>View Details</summary>
+                        <pre>${JSON.stringify(result, null, 2)}</pre>
+                    </details>
+                `;
+                setStatus('statusOutput', output, 'success');
+            } catch (error) {
+                setStatus('statusOutput', `❌ Error: ${error.message}`, 'error');
+            }
+        }
+        
+        async function checkAttendanceTable() {
+            setLoading('statusOutput', 'Checking attendance table structure...');
+            try {
+                const result = await apiCall('/setup/check-attendance-table');
+                const output = `
+                    <h4>✅ Attendance Table Structure</h4>
+                    <p><strong>Columns found:</strong> ${result.columns.length}</p>
+                    <details>
+                        <summary>View Table Structure</summary>
+                        <pre>${JSON.stringify(result.columns, null, 2)}</pre>
+                    </details>
+                `;
+                setStatus('statusOutput', output, 'success');
+            } catch (error) {
+                setStatus('statusOutput', `❌ Error: ${error.message}`, 'error');
+            }
+        }
+        
+        async function checkGradesTable() {
+            setLoading('statusOutput', 'Checking grades table structure...');
+            try {
+                const result = await apiCall('/setup/check-grades-table');
+                
+                if (result.table_exists) {
+                    const output = `
+                        <h4>✅ Grades Table Found</h4>
+                        <p><strong>Columns found:</strong> ${result.columns.length}</p>
+                        <p><strong>Total grades:</strong> ${result.total_grades}</p>
+                        <h5>Current Grade Distribution:</h5>
+                        <ul>
+                            ${result.grade_distribution.map(grade => 
+                                `<li><strong>${grade.grade_value}:</strong> ${grade.count} grades</li>`
+                            ).join('')}
+                        </ul>
+                        <details>
+                            <summary>View Table Structure</summary>
+                            <pre>${JSON.stringify(result.columns, null, 2)}</pre>
+                        </details>
+                    `;
+                    setStatus('statusOutput', output, 'success');
+                } else {
+                    const output = `
+                        <h4>⚠️ Grades Table Not Found</h4>
+                        <p>The grades table doesn't exist yet. This is normal if no grades have been entered.</p>
+                        <p><strong>Next steps:</strong></p>
+                        <ul>
+                            <li>The migration will create the table with the new A-F grading system</li>
+                            <li>You can proceed with the migration safely</li>
+                        </ul>
+                    `;
+                    setStatus('statusOutput', output, 'warning');
+                }
+            } catch (error) {
+                setStatus('statusOutput', `❌ Error: ${error.message}`, 'error');
+            }
+        }
+        
+        async function migrateGradingSystem() {
+            const confirmMigration = confirm(
+                'Are you sure you want to migrate the grading system from E/G/S/N to A/B/C/D/F?\n\n' +
+                'This will:\n' +
+                '• Convert existing grades: E→A, G→B, S→C, N→D\n' +
+                '• Update the database schema to support A+, A, A-, B+, B, B-, C+, C, C-, D+, D, D-, F\n' +
+                '• This action cannot be easily reversed\n\n' +
+                'Click OK to proceed or Cancel to abort.'
+            );
+            
+            if (!confirmMigration) {
+                setStatus('migrationOutput', 'Migration cancelled by user.', 'warning');
+                return;
+            }
+            
+            setLoading('migrationOutput', 'Migrating grading system... This may take a few moments.');
+            setLoading('overallStatus', 'Migration in progress...');
+            
+            try {
+                const result = await apiCall('/setup/migrate-grading-system', 'POST');
+                
+                const output = `
+                    <h4>✅ Migration Completed Successfully!</h4>
+                    <p><strong>Status:</strong> ${result.message}</p>
+                    <h5>Grade Conversions:</h5>
+                    <ul>
+                        ${result.changes.map(change => `<li>${change}</li>`).join('')}
+                    </ul>
+                    <p><strong>Completed:</strong> ${new Date(result.timestamp).toLocaleString()}</p>
+                    <details>
+                        <summary>View Full Response</summary>
+                        <pre>${JSON.stringify(result, null, 2)}</pre>
+                    </details>
+                `;
+                
+                setStatus('migrationOutput', output, 'success');
+                setStatus('overallStatus', '✅ Migration completed successfully! Your system now uses A-F grading with plus/minus modifiers.', 'success');
+                
+                // Auto-refresh status after migration
+                setTimeout(() => {
+                    checkSubjectsTerms();
+                }, 1000);
+                
+            } catch (error) {
+                const output = `
+                    <h4>❌ Migration Failed</h4>
+                    <p><strong>Error:</strong> ${error.message}</p>
+                    <p>Please check the backend logs for more details.</p>
+                `;
+                setStatus('migrationOutput', output, 'error');
+                setStatus('overallStatus', '❌ Migration failed. Please check the error details above.', 'error');
+            }
+        }
+        
+        // Auto-check status on page load
+        document.addEventListener('DOMContentLoaded', () => {
+            checkSubjectsTerms();
+        });
+    </script>
+</body>
+</html>

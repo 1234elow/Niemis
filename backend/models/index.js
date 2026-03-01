@@ -28,6 +28,12 @@ const Class = require('./Class')(sequelize, DataTypes);
 const Term = require('./Term')(sequelize, DataTypes);
 const Grade = require('./Grade')(sequelize, DataTypes);
 const ReportCard = require('./ReportCard')(sequelize, DataTypes);
+const SchoolDayPolicy = require('./SchoolDayPolicy')(sequelize, DataTypes);
+const ClassTimetableSlot = require('./ClassTimetableSlot')(sequelize, DataTypes);
+const GradingPolicy = require('./GradingPolicy')(sequelize, DataTypes);
+const DataQualityIssue = require('./DataQualityIssue')(sequelize, DataTypes);
+const DataQualitySnapshot = require('./DataQualitySnapshot')(sequelize, DataTypes);
+const BsseeApplication = require('./BsseeApplication')(sequelize, DataTypes);
 
 // Define associations
 const models = {
@@ -56,7 +62,13 @@ const models = {
     Class,
     Term,
     Grade,
-    ReportCard
+    ReportCard,
+    SchoolDayPolicy,
+    ClassTimetableSlot,
+    GradingPolicy,
+    DataQualityIssue,
+    DataQualitySnapshot,
+    BsseeApplication
 };
 
 // User associations
@@ -71,6 +83,8 @@ School.hasMany(Staff, { foreignKey: 'school_id' });
 School.hasMany(Student, { foreignKey: 'school_id' });
 School.hasMany(Facility, { foreignKey: 'school_id' });
 School.hasMany(RFIDDevice, { foreignKey: 'school_id' });
+School.hasOne(SchoolDayPolicy, { foreignKey: 'school_id' });
+School.hasMany(GradingPolicy, { foreignKey: 'school_id' });
 
 // Staff associations
 Staff.belongsTo(User, { foreignKey: 'user_id' });
@@ -78,6 +92,7 @@ Staff.belongsTo(School, { foreignKey: 'school_id' });
 Staff.hasMany(TeacherEvaluation, { foreignKey: 'teacher_id' });
 Staff.hasMany(ProfessionalDevelopment, { foreignKey: 'staff_id' });
 Staff.hasMany(AcademicRecord, { foreignKey: 'teacher_id' });
+Staff.hasMany(ClassTimetableSlot, { foreignKey: 'teacher_id' });
 
 // Student associations
 Student.belongsTo(User, { foreignKey: 'user_id' });
@@ -130,6 +145,7 @@ Class.belongsTo(Staff, { foreignKey: 'class_teacher_id', as: 'classTeacher' });
 Class.hasMany(Student, { foreignKey: 'class_id' });
 Class.hasMany(Grade, { foreignKey: 'class_id' });
 Class.hasMany(ReportCard, { foreignKey: 'class_id' });
+Class.hasMany(ClassTimetableSlot, { foreignKey: 'class_id' });
 
 // School associations for new models
 School.hasMany(Class, { foreignKey: 'school_id' });
@@ -145,6 +161,7 @@ Student.hasMany(ReportCard, { foreignKey: 'student_id' });
 
 // Subject associations
 Subject.hasMany(Grade, { foreignKey: 'subject_id' });
+Subject.hasMany(ClassTimetableSlot, { foreignKey: 'subject_id' });
 
 // Term associations
 Term.hasMany(Grade, { foreignKey: 'term_id' });
@@ -157,10 +174,41 @@ Grade.belongsTo(Class, { foreignKey: 'class_id' });
 Grade.belongsTo(Term, { foreignKey: 'term_id' });
 Grade.belongsTo(Staff, { foreignKey: 'teacher_id', as: 'teacher' });
 
+// School policy and timetable associations
+SchoolDayPolicy.belongsTo(School, { foreignKey: 'school_id' });
+GradingPolicy.belongsTo(School, { foreignKey: 'school_id' });
+ClassTimetableSlot.belongsTo(Class, { foreignKey: 'class_id' });
+ClassTimetableSlot.belongsTo(Staff, { foreignKey: 'teacher_id', as: 'teacher' });
+ClassTimetableSlot.belongsTo(Subject, { foreignKey: 'subject_id' });
+
 // ReportCard associations
 ReportCard.belongsTo(Student, { foreignKey: 'student_id' });
 ReportCard.belongsTo(Class, { foreignKey: 'class_id' });
 ReportCard.belongsTo(Term, { foreignKey: 'term_id' });
+
+// Data quality associations
+DataQualityIssue.belongsTo(School, { foreignKey: 'school_id' });
+School.hasMany(DataQualityIssue, { foreignKey: 'school_id' });
+
+DataQualitySnapshot.belongsTo(School, { foreignKey: 'school_id' });
+School.hasMany(DataQualitySnapshot, { foreignKey: 'school_id' });
+
+// BSSEE associations
+BsseeApplication.belongsTo(Student, { foreignKey: 'student_id' });
+Student.hasMany(BsseeApplication, { foreignKey: 'student_id' });
+
+BsseeApplication.belongsTo(School, { foreignKey: 'primary_school_id', as: 'primarySchool' });
+BsseeApplication.belongsTo(School, { foreignKey: 'preferred_school_1_id', as: 'preferredSchool1' });
+BsseeApplication.belongsTo(School, { foreignKey: 'preferred_school_2_id', as: 'preferredSchool2' });
+BsseeApplication.belongsTo(School, { foreignKey: 'preferred_school_3_id', as: 'preferredSchool3' });
+BsseeApplication.belongsTo(School, { foreignKey: 'placement_school_id', as: 'placementSchool' });
+School.hasMany(BsseeApplication, { foreignKey: 'primary_school_id', as: 'bsseePrimaryApplications' });
+School.hasMany(BsseeApplication, { foreignKey: 'placement_school_id', as: 'bsseePlacements' });
+
+BsseeApplication.belongsTo(User, { foreignKey: 'submitted_by', as: 'submittedByUser' });
+BsseeApplication.belongsTo(User, { foreignKey: 'reviewed_by', as: 'reviewedByUser' });
+User.hasMany(BsseeApplication, { foreignKey: 'submitted_by', as: 'submittedBsseeApplications' });
+User.hasMany(BsseeApplication, { foreignKey: 'reviewed_by', as: 'reviewedBsseeApplications' });
 
 module.exports = {
     sequelize,

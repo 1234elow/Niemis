@@ -1,0 +1,33 @@
+# Dependencies
+node_modules/
+**/node_modules/
+
+# Build artifacts
+build/
+dist/
+**/build/
+**/dist/
+
+# Environment / secrets
+.env
+**/.env
+**/.env.local
+**/.env.production
+**/.env.vercel
+
+# Logs
+logs/
+*.log
+*.out.log
+*.err.log
+frontend/backend.log
+frontend/frontend.log
+frontend/install.log
+
+# OS / editor
+.DS_Store
+Thumbs.db
+
+# Local backups / misc
+*.bundle
+Screenshots/

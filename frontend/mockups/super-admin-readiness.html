@@ -1,0 +1,633 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>NiEMIS Command Center - Readiness Tab</title>
+
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,100..1000;1,9..40,100..1000&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+
+  <style>
+    :root {
+      --cc-void: #060a13;
+      --cc-deep: #0a101f;
+      --cc-primary: #0f172a;
+      --cc-secondary: #1e293b;
+      --cc-glass: rgba(30, 41, 59, 0.75);
+      --cc-glass-border: rgba(148, 163, 184, 0.08);
+      --cc-glass-highlight: rgba(255, 255, 255, 0.03);
+      --cc-surface: rgba(255, 255, 255, 0.02);
+      --cc-text-primary: #f1f5f9;
+      --cc-text-secondary: #94a3b8;
+      --cc-text-muted: #64748b;
+      --cc-text-dim: #475569;
+      --cc-teal: #14b8a6;
+      --cc-teal-glow: rgba(20, 184, 166, 0.15);
+      --cc-blue: #3b82f6;
+      --cc-blue-glow: rgba(59, 130, 246, 0.15);
+      --cc-emerald: #10b981;
+      --cc-emerald-glow: rgba(16, 185, 129, 0.15);
+      --cc-amber: #f59e0b;
+      --cc-amber-glow: rgba(245, 158, 11, 0.12);
+      --cc-coral: #f43f5e;
+      --cc-coral-glow: rgba(244, 63, 94, 0.12);
+      --cc-purple: #a855f7;
+      --cc-purple-glow: rgba(168, 85, 247, 0.15);
+      --font-display: 'Space Mono', monospace;
+      --font-body: 'DM Sans', sans-serif;
+      --space-1: 4px;
+      --space-2: 8px;
+      --space-3: 12px;
+      --space-4: 16px;
+      --space-5: 20px;
+      --space-6: 24px;
+      --radius-sm: 6px;
+      --radius-md: 10px;
+      --radius-lg: 16px;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html { font-size: 16px; -webkit-font-smoothing: antialiased; }
+    body {
+      font-family: var(--font-body);
+      background: var(--cc-void);
+      color: var(--cc-text-primary);
+      line-height: 1.5;
+      min-height: 100vh;
+    }
+
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background:
+        radial-gradient(ellipse 80% 50% at 50% 30%, var(--cc-emerald-glow) 0%, transparent 50%),
+        radial-gradient(ellipse 60% 40% at 80% 70%, var(--cc-teal-glow) 0%, transparent 40%),
+        linear-gradient(180deg, var(--cc-void) 0%, var(--cc-deep) 50%, var(--cc-primary) 100%);
+      pointer-events: none;
+      z-index: -1;
+    }
+
+    body::after {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
+      opacity: 0.03;
+      pointer-events: none;
+      z-index: 1000;
+    }
+
+    .dashboard { max-width: 1440px; margin: 0 auto; padding: var(--space-6); position: relative; z-index: 1; }
+
+    /* Compact Header */
+    .compact-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: var(--space-4) var(--space-5);
+      background: var(--cc-glass);
+      backdrop-filter: blur(20px);
+      border: 1px solid var(--cc-glass-border);
+      border-radius: var(--radius-lg);
+      margin-bottom: var(--space-5);
+    }
+
+    .header-left { display: flex; align-items: center; gap: var(--space-4); }
+
+    .logo-mark {
+      width: 40px;
+      height: 40px;
+      background: linear-gradient(135deg, var(--cc-teal) 0%, var(--cc-blue) 100%);
+      border-radius: var(--radius-sm);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: var(--font-display);
+      font-weight: 700;
+      font-size: 12px;
+      color: white;
+    }
+
+    .header-title { font-family: var(--font-display); font-size: 16px; font-weight: 700; }
+    .breadcrumb { display: flex; align-items: center; gap: var(--space-2); font-size: 12px; color: var(--cc-text-muted); }
+    .breadcrumb-current { color: var(--cc-teal); font-weight: 600; }
+
+    /* Tab Navigation */
+    .tab-navigation {
+      display: flex;
+      align-items: center;
+      gap: var(--space-1);
+      padding: var(--space-1);
+      background: var(--cc-surface);
+      border: 1px solid var(--cc-glass-border);
+      border-radius: var(--radius-md);
+      margin-bottom: var(--space-5);
+    }
+
+    .tab-btn {
+      display: flex;
+      align-items: center;
+      gap: var(--space-2);
+      padding: var(--space-3) var(--space-5);
+      background: transparent;
+      border: none;
+      border-radius: var(--radius-sm);
+      font-family: var(--font-body);
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--cc-text-secondary);
+      cursor: pointer;
+      transition: all 0.2s ease;
+      position: relative;
+    }
+
+    .tab-btn:hover { color: var(--cc-text-primary); background: var(--cc-glass-highlight); }
+    .tab-btn.active { background: var(--cc-teal-glow); color: var(--cc-teal); }
+    .tab-btn.active::after {
+      content: '';
+      position: absolute;
+      bottom: -1px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 24px;
+      height: 3px;
+      background: var(--cc-teal);
+      border-radius: 3px 3px 0 0;
+    }
+
+    .tab-badge {
+      min-width: 18px;
+      height: 18px;
+      padding: 0 6px;
+      background: var(--cc-coral);
+      color: white;
+      border-radius: 100px;
+      font-size: 10px;
+      font-weight: 700;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    /* Readiness Panel */
+    .readiness-panel {
+      background: var(--cc-glass);
+      backdrop-filter: blur(16px);
+      border: 1px solid var(--cc-glass-border);
+      border-radius: var(--radius-lg);
+      padding: var(--space-6);
+      animation: panelFade 0.5s ease-out;
+    }
+
+    @keyframes panelFade {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .readiness-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: var(--space-5);
+      flex-wrap: wrap;
+      gap: var(--space-4);
+    }
+
+    .readiness-title {
+      font-family: var(--font-display);
+      font-size: 18px;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+    }
+
+    .readiness-actions {
+      display: flex;
+      align-items: center;
+      gap: var(--space-3);
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: var(--space-2);
+      padding: var(--space-2) var(--space-4);
+      border-radius: var(--radius-sm);
+      font-family: var(--font-body);
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      border: none;
+    }
+
+    .btn-outline {
+      background: transparent;
+      border: 1px solid var(--cc-glass-border);
+      color: var(--cc-text-secondary);
+    }
+
+    .btn-outline:hover {
+      border-color: var(--cc-teal);
+      color: var(--cc-teal);
+      background: var(--cc-teal-glow);
+    }
+
+    .status-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: var(--space-2);
+      padding: var(--space-2) var(--space-3);
+      border-radius: 100px;
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+    .status-badge.success {
+      background: var(--cc-emerald-glow);
+      border: 1px solid var(--cc-emerald);
+      color: var(--cc-emerald);
+    }
+
+    /* Score Section */
+    .score-bar {
+      height: 10px;
+      background: var(--cc-surface);
+      border-radius: 100px;
+      overflow: hidden;
+      margin-bottom: var(--space-5);
+    }
+
+    .score-fill {
+      height: 100%;
+      background: linear-gradient(90deg, var(--cc-emerald) 0%, var(--cc-teal) 100%);
+      border-radius: 100px;
+      transition: width 1s ease-out;
+    }
+
+    /* Pillars Grid */
+    .pillars-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: var(--space-5);
+      margin-bottom: var(--space-6);
+    }
+
+    .pillar-card {
+      background: var(--cc-surface);
+      border: 1px solid var(--cc-glass-border);
+      border-radius: var(--radius-md);
+      padding: var(--space-5);
+      transition: all 0.25s ease;
+    }
+
+    .pillar-card:hover {
+      border-color: var(--cc-teal);
+      box-shadow: 0 0 30px -10px var(--cc-teal-glow);
+    }
+
+    .pillar-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: var(--space-3);
+    }
+
+    .pillar-title {
+      font-family: var(--font-display);
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--cc-text-primary);
+    }
+
+    .pillar-score {
+      padding: var(--space-1) var(--space-2);
+      border-radius: 100px;
+      font-size: 11px;
+      font-weight: 700;
+    }
+
+    .pillar-score.success {
+      background: var(--cc-emerald-glow);
+      color: var(--cc-emerald);
+    }
+
+    .pillar-score.warning {
+      background: var(--cc-amber-glow);
+      color: var(--cc-amber);
+    }
+
+    .pillar-summary {
+      font-size: 12px;
+      color: var(--cc-text-secondary);
+      margin-bottom: var(--space-3);
+    }
+
+    .pillar-bar {
+      height: 6px;
+      background: var(--cc-glass-border);
+      border-radius: 100px;
+      overflow: hidden;
+      margin-bottom: var(--space-3);
+    }
+
+    .pillar-fill {
+      height: 100%;
+      border-radius: 100px;
+      transition: width 0.8s ease-out;
+    }
+
+    .pillar-fill.success { background: var(--cc-emerald); }
+    .pillar-fill.warning { background: var(--cc-amber); }
+
+    .pillar-metrics {
+      margin-bottom: var(--space-3);
+    }
+
+    .pillar-metric {
+      font-size: 11px;
+      color: var(--cc-text-muted);
+      margin-bottom: var(--space-1);
+    }
+
+    .pillar-actions {
+      display: flex;
+      gap: var(--space-2);
+      flex-wrap: wrap;
+    }
+
+    .pillar-btn {
+      padding: var(--space-1) var(--space-3);
+      background: transparent;
+      border: 1px solid var(--cc-glass-border);
+      border-radius: var(--radius-sm);
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--cc-text-secondary);
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .pillar-btn:hover {
+      border-color: var(--cc-teal);
+      color: var(--cc-teal);
+      background: var(--cc-teal-glow);
+    }
+
+    /* Checklist Section */
+    .checklist-section {
+      border-top: 1px solid var(--cc-glass-border);
+      padding-top: var(--space-5);
+    }
+
+    .section-title {
+      font-family: var(--font-display);
+      font-size: 14px;
+      font-weight: 700;
+      color: var(--cc-text-primary);
+      margin-bottom: var(--space-4);
+    }
+
+    .checklist-chips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: var(--space-2);
+    }
+
+    .checklist-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: var(--space-1);
+      padding: var(--space-1) var(--space-3);
+      border-radius: 100px;
+      font-size: 11px;
+      font-weight: 600;
+      transition: all 0.2s ease;
+    }
+
+    .checklist-chip.complete {
+      background: var(--cc-emerald-glow);
+      border: 1px solid var(--cc-emerald);
+      color: var(--cc-emerald);
+    }
+
+    .checklist-chip.in-progress {
+      background: var(--cc-amber-glow);
+      border: 1px solid var(--cc-amber);
+      color: var(--cc-amber);
+    }
+
+    .checklist-chip.todo {
+      background: transparent;
+      border: 1px solid var(--cc-glass-border);
+      color: var(--cc-text-secondary);
+    }
+
+    .check-icon {
+      width: 12px;
+      height: 12px;
+    }
+
+    /* Footer */
+    .readiness-footer {
+      margin-top: var(--space-5);
+      padding-top: var(--space-4);
+      border-top: 1px solid var(--cc-glass-border);
+      font-size: 11px;
+      color: var(--cc-text-dim);
+    }
+
+    @media (max-width: 768px) {
+      .pillars-grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <div class="dashboard">
+
+    <!-- Compact Header -->
+    <header class="compact-header">
+      <div class="header-left">
+        <div class="logo-mark">NI</div>
+        <div>
+          <div class="header-title">Command Center</div>
+          <div class="breadcrumb">
+            <span>Dashboard</span>
+            <span>/</span>
+            <span class="breadcrumb-current">Readiness</span>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <!-- Tab Navigation -->
+    <nav class="tab-navigation">
+      <button class="tab-btn">Operations</button>
+      <button class="tab-btn">
+        Data Quality
+        <span class="tab-badge">3</span>
+      </button>
+      <button class="tab-btn">Trends</button>
+      <button class="tab-btn active">Readiness</button>
+      <button class="tab-btn">Audit</button>
+    </nav>
+
+    <!-- Readiness Panel -->
+    <div class="readiness-panel">
+
+      <div class="readiness-header">
+        <h2 class="readiness-title">Barbados EMIS Readiness</h2>
+        <div class="readiness-actions">
+          <div class="status-badge success">On Track (87%)</div>
+          <button class="btn btn-outline">Open Workspace</button>
+        </div>
+      </div>
+
+      <!-- Score Bar -->
+      <div class="score-bar">
+        <div class="score-fill" style="width: 87%"></div>
+      </div>
+
+      <!-- Pillars Grid -->
+      <div class="pillars-grid">
+
+        <!-- Data Completeness -->
+        <div class="pillar-card">
+          <div class="pillar-header">
+            <span class="pillar-title">Data Completeness</span>
+            <span class="pillar-score success">92%</span>
+          </div>
+          <p class="pillar-summary">Student and staff records are well-populated across all required fields.</p>
+          <div class="pillar-bar">
+            <div class="pillar-fill success" style="width: 92%"></div>
+          </div>
+          <div class="pillar-metrics">
+            <div class="pillar-metric">24,750 students with complete profiles</div>
+            <div class="pillar-metric">1,842 teachers with certifications</div>
+            <div class="pillar-metric">106 schools fully configured</div>
+          </div>
+          <div class="pillar-actions">
+            <button class="pillar-btn">Review Missing</button>
+            <button class="pillar-btn">Export Report</button>
+          </div>
+        </div>
+
+        <!-- System Integration -->
+        <div class="pillar-card">
+          <div class="pillar-header">
+            <span class="pillar-title">System Integration</span>
+            <span class="pillar-score success">88%</span>
+          </div>
+          <p class="pillar-summary">RFID devices and external systems are connected and operational.</p>
+          <div class="pillar-bar">
+            <div class="pillar-fill success" style="width: 88%"></div>
+          </div>
+          <div class="pillar-metrics">
+            <div class="pillar-metric">98 RFID readers active</div>
+            <div class="pillar-metric">API uptime: 99.7%</div>
+            <div class="pillar-metric">Last sync: 2 minutes ago</div>
+          </div>
+          <div class="pillar-actions">
+            <button class="pillar-btn">Device Status</button>
+            <button class="pillar-btn">Sync Logs</button>
+          </div>
+        </div>
+
+        <!-- Compliance -->
+        <div class="pillar-card">
+          <div class="pillar-header">
+            <span class="pillar-title">Compliance & Reporting</span>
+            <span class="pillar-score warning">76%</span>
+          </div>
+          <p class="pillar-summary">Some regulatory reports require additional data validation.</p>
+          <div class="pillar-bar">
+            <div class="pillar-fill warning" style="width: 76%"></div>
+          </div>
+          <div class="pillar-metrics">
+            <div class="pillar-metric">12 pending regulatory submissions</div>
+            <div class="pillar-metric">3 reports need verification</div>
+            <div class="pillar-metric">MOE deadline: March 15, 2026</div>
+          </div>
+          <div class="pillar-actions">
+            <button class="pillar-btn">View Reports</button>
+            <button class="pillar-btn">Submit Queue</button>
+          </div>
+        </div>
+
+        <!-- User Adoption -->
+        <div class="pillar-card">
+          <div class="pillar-header">
+            <span class="pillar-title">User Adoption</span>
+            <span class="pillar-score success">91%</span>
+          </div>
+          <p class="pillar-summary">Teachers and administrators are actively using the system daily.</p>
+          <div class="pillar-bar">
+            <div class="pillar-fill success" style="width: 91%"></div>
+          </div>
+          <div class="pillar-metrics">
+            <div class="pillar-metric">1,678 active users this week</div>
+            <div class="pillar-metric">Average session: 24 minutes</div>
+            <div class="pillar-metric">Mobile usage: 34%</div>
+          </div>
+          <div class="pillar-actions">
+            <button class="pillar-btn">User Activity</button>
+            <button class="pillar-btn">Training Status</button>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Implementation Checklist -->
+      <div class="checklist-section">
+        <h3 class="section-title">Implementation Checklist</h3>
+        <div class="checklist-chips">
+          <span class="checklist-chip complete">
+            <svg class="check-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="20 6 9 17 4 12"/>
+            </svg>
+            Complete: School Setup
+          </span>
+          <span class="checklist-chip complete">
+            <svg class="check-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="20 6 9 17 4 12"/>
+            </svg>
+            Complete: Student Import
+          </span>
+          <span class="checklist-chip complete">
+            <svg class="check-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="20 6 9 17 4 12"/>
+            </svg>
+            Complete: Staff Profiles
+          </span>
+          <span class="checklist-chip in-progress">
+            <svg class="check-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="12" cy="12" r="10"/>
+              <path d="M12 6v6l4 2"/>
+            </svg>
+            In Progress: RFID Rollout
+          </span>
+          <span class="checklist-chip in-progress">
+            <svg class="check-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="12" cy="12" r="10"/>
+              <path d="M12 6v6l4 2"/>
+            </svg>
+            In Progress: Grade Migration
+          </span>
+          <span class="checklist-chip todo">To Do: MOE Report Templates</span>
+          <span class="checklist-chip todo">To Do: Parent Portal</span>
+          <span class="checklist-chip todo">To Do: Mobile App</span>
+        </div>
+      </div>
+
+      <div class="readiness-footer">
+        Last assessed: February 24, 2026 2:34:18 PM
+      </div>
+
+    </div>
+
+  </div>
+</body>
+</html>
