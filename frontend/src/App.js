@@ -125,68 +125,30 @@ const DashboardRouter = () => {
 
   // Route students to their dedicated dashboard with error boundary
   if (user.role === "student") {
-    try {
-      return (
-        <>
-          {debugInfo}
-          <LazyLoadErrorBoundary>
-            <Suspense fallback={<LoadingSpinner />}>
-              <StudentDashboard />
-            </Suspense>
-          </LazyLoadErrorBoundary>
-        </>
-      );
-    } catch (error) {
-      console.error("Error rendering StudentDashboard:", error);
-      return (
-        <>
-          {debugInfo}
-          <Box sx={{ p: 3 }}>
-            <Typography variant="h6" color="error">
-              Error loading Student Dashboard. Falling back to admin view.
-            </Typography>
-          </Box>
-          <LazyLoadErrorBoundary>
-            <Suspense fallback={<LoadingSpinner />}>
-              <DashboardPage />
-            </Suspense>
-          </LazyLoadErrorBoundary>
-        </>
-      );
-    }
+    return (
+      <>
+        {debugInfo}
+        <LazyLoadErrorBoundary>
+          <Suspense fallback={<LoadingSpinner />}>
+            <StudentDashboard />
+          </Suspense>
+        </LazyLoadErrorBoundary>
+      </>
+    );
   }
 
   // Route teachers to their dashboard
   if (user.role === "teacher") {
-    try {
-      return (
-        <>
-          {debugInfo}
-          <LazyLoadErrorBoundary>
-            <Suspense fallback={<LoadingSpinner />}>
-              <TeacherDashboard />
-            </Suspense>
-          </LazyLoadErrorBoundary>
-        </>
-      );
-    } catch (error) {
-      console.error("Error rendering TeacherDashboard:", error);
-      return (
-        <>
-          {debugInfo}
-          <Box sx={{ p: 3 }}>
-            <Typography variant="h6" color="error">
-              Error loading Teacher Dashboard. Falling back to admin view.
-            </Typography>
-          </Box>
-          <LazyLoadErrorBoundary>
-            <Suspense fallback={<LoadingSpinner />}>
-              <DashboardPage />
-            </Suspense>
-          </LazyLoadErrorBoundary>
-        </>
-      );
-    }
+    return (
+      <>
+        {debugInfo}
+        <LazyLoadErrorBoundary>
+          <Suspense fallback={<LoadingSpinner />}>
+            <TeacherDashboard />
+          </Suspense>
+        </LazyLoadErrorBoundary>
+      </>
+    );
   }
 
   // Route all other roles to the admin dashboard

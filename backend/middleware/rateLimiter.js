@@ -4,13 +4,17 @@ const { ddosProtection } = require('../config/ddos-protection');
 
 // General API rate limiting
 const createRateLimiter = (windowMs, max, message) => {
+    const resolvedWindowMs = windowMs || parseInt(process.env.RATE_LIMIT_WINDOW_MS) || 15 * 60 * 1000;
+    const resolvedMax = max || parseInt(process.env.RATE_LIMIT_MAX_REQUESTS) || 100;
+    const resolvedMessage = message || {
+        error: 'Too many requests from this IP, please try again later.',
+        retryAfter: Math.ceil(resolvedWindowMs / 1000)
+    };
+
     return rateLimit({
-        windowMs: windowMs || parseInt(process.env.RATE_LIMIT_WINDOW_MS) || 15 * 60 * 1000, // 15 minutes
-        max: max || parseInt(process.env.RATE_LIMIT_MAX_REQUESTS) || 100,
-        message: message || {
-            error: 'Too many requests from this IP, please try again later.',
-            retryAfter: Math.ceil(windowMs / 1000)
-        },
+        windowMs: resolvedWindowMs, // 15 minutes
+        max: resolvedMax,
+        message: resolvedMessage,
         standardHeaders: true, // Return rate limit info in the `RateLimit-*` headers
         legacyHeaders: false, // Disable the `X-RateLimit-*` headers
         skip: (req, res) => {
@@ -30,7 +34,7 @@ const createRateLimiter = (windowMs, max, message) => {
             // Use user ID if authenticated, otherwise IP
             return req.user ? `user_${req.user.id}` : req.ip;
         },
-        onLimitReached: (req, res) => {
+        handler: (req, res, _next, options) => {
             logger.warn('Rate limit exceeded', {
                 ip: req.ip,
                 userAgent: req.get('User-Agent'),
@@ -40,6 +44,16 @@ const createRateLimiter = (windowMs, max, message) => {
             
             // Track rate limit violation for DDoS protection
             ddosProtection.trackRateLimitViolation(req.ip, 'rate_limit_exceeded');
+
+            const statusCode = Number(options?.statusCode || 429);
+            if (typeof resolvedMessage === 'string') {
+                return res.status(statusCode).json({
+                    error: resolvedMessage,
+                    retryAfter: Math.ceil(resolvedWindowMs / 1000)
+                });
+            }
+
+            return res.status(statusCode).json(resolvedMessage);
         }
     });
 };

@@ -1,5 +1,10 @@
 const { sequelize, Subject, Class, Term, Grade, ReportCard, Student, Staff, School, Parent, StudentParentRelationship, StudentHealth, FamilySocialAssessment, DisabilityAssessment, User } = require('./models');
 const bcrypt = require('bcryptjs');
+const { randomBytes } = require('crypto');
+
+const SEED_TEACHER_PASSWORD = (process.env.SEED_TEACHER_DEFAULT_PASSWORD || '').trim() || `Teach-${randomBytes(8).toString('base64url')}!`;
+const SEED_STUDENT_PASSWORD = (process.env.SEED_STUDENT_DEFAULT_PASSWORD || '').trim() || `Student-${randomBytes(8).toString('base64url')}!`;
+const SEED_PARENT_PASSWORD = (process.env.SEED_PARENT_DEFAULT_PASSWORD || '').trim() || `Parent-${randomBytes(8).toString('base64url')}!`;
 
 // Sample data for comprehensive student profiles
 const sampleData = {
@@ -204,7 +209,7 @@ async function seedGradingData() {
 
 async function createTeacher(schoolId, firstName, lastName, email) {
     // Create user account
-    const password_hash = await bcrypt.hash('teacher123', 12);
+    const password_hash = await bcrypt.hash(SEED_TEACHER_PASSWORD, 12);
     const [user] = await User.findOrCreate({
         where: { email },
         defaults: {
@@ -244,7 +249,7 @@ async function createStudentsWithProfiles(studentsData, schoolId, classId, grade
             `CCFS-IB-${(i + 1).toString().padStart(3, '0')}`;
 
         // Create user account for student
-        const password_hash = await bcrypt.hash('student123', 12);
+        const password_hash = await bcrypt.hash(SEED_STUDENT_PASSWORD, 12);
         const username = `${studentData.firstName.toLowerCase().replace(/[^a-z0-9]/g, '')}${studentData.lastName.toLowerCase().replace(/[^a-z0-9]/g, '')}${i + 1}`;
         const email = `${username}@student.ccfs.edu.bb`;
 
@@ -358,7 +363,7 @@ async function createParentsForStudent(student, studentData, index) {
         defaults: {
             username: `${studentData.firstName.toLowerCase().replace(/[^a-z0-9]/g, '')}mother${index}`,
             email: motherEmail,
-            password_hash: await bcrypt.hash('parent123', 12),
+            password_hash: await bcrypt.hash(SEED_PARENT_PASSWORD, 12),
             role: 'parent'
         }
     });
@@ -386,7 +391,7 @@ async function createParentsForStudent(student, studentData, index) {
         defaults: {
             username: `${studentData.firstName.toLowerCase().replace(/[^a-z0-9]/g, '')}father${index}`,
             email: fatherEmail,
-            password_hash: await bcrypt.hash('parent123', 12),
+            password_hash: await bcrypt.hash(SEED_PARENT_PASSWORD, 12),
             role: 'parent'
         }
     });

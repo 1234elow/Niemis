@@ -40,8 +40,7 @@ const ACCESS_PERMISSIONS = {
     AUDIT_VIEW: 'audit.view',
     RFID_MANAGE: 'rfid.manage',
     SYSTEM_CONFIG: 'system.config',
-    ACCESS_MATRIX_VIEW: 'access.matrix.view',
-    DEMO_DATA_MANAGE: 'demo_data.manage'
+    ACCESS_MATRIX_VIEW: 'access.matrix.view'
 };
 
 const ACCESS_SCOPES = {
@@ -95,8 +94,7 @@ const ACCESS_ROLE_DEFINITIONS = {
             ACCESS_PERMISSIONS.USERS_MANAGE_ACCOUNTS,
             ACCESS_PERMISSIONS.AUDIT_VIEW,
             ACCESS_PERMISSIONS.RFID_MANAGE,
-            ACCESS_PERMISSIONS.ACCESS_MATRIX_VIEW,
-            ACCESS_PERMISSIONS.DEMO_DATA_MANAGE
+            ACCESS_PERMISSIONS.ACCESS_MATRIX_VIEW
         ]
     },
     school_admin: {
@@ -272,15 +270,17 @@ const ACCESS_ROUTE_RULES = {
         { methods: ['POST'], pattern: /^\/bssee\/applications$/, permission: ACCESS_PERMISSIONS.BSSEE_MANAGE },
         { methods: ['PATCH'], pattern: /^\/bssee\/applications\/[^/]+$/, permission: ACCESS_PERMISSIONS.BSSEE_MANAGE },
         { methods: ['GET'], pattern: /^\/transfers\/workflow$/, permission: ACCESS_PERMISSIONS.TRANSFERS_VIEW },
+        { methods: ['GET'], pattern: /^\/transfers\/teachers\/workflow$/, permission: ACCESS_PERMISSIONS.TRANSFERS_VIEW },
         { methods: ['PATCH'], pattern: /^\/transfers\/[^/]+\/workflow$/, permission: ACCESS_PERMISSIONS.TRANSFERS_MANAGE },
+        { methods: ['PATCH'], pattern: /^\/transfers\/teachers\/[^/]+\/workflow$/, permission: ACCESS_PERMISSIONS.TRANSFERS_MANAGE },
         { methods: ['GET'], pattern: /^\/audit-logs$/, permission: ACCESS_PERMISSIONS.AUDIT_VIEW },
         { methods: ['PATCH'], pattern: /^\/staff\/[^/]+\/role$/, permission: ACCESS_PERMISSIONS.USERS_MANAGE_ROLES },
         { methods: ['GET'], pattern: /^\/staff\/directory$/, permission: ACCESS_PERMISSIONS.USERS_VIEW },
         { methods: ['GET'], pattern: /^\/students\/directory$/, permission: ACCESS_PERMISSIONS.STUDENTS_VIEW },
         { methods: ['GET'], pattern: /^\/schools\/directory$/, permission: ACCESS_PERMISSIONS.SCHOOLS_VIEW },
         { methods: ['POST'], pattern: /^\/transfers\/initiate$/, permission: ACCESS_PERMISSIONS.TRANSFERS_MANAGE },
+        { methods: ['POST'], pattern: /^\/transfers\/teachers\/initiate$/, permission: ACCESS_PERMISSIONS.TRANSFERS_MANAGE },
         { methods: ['GET'], pattern: /^\/transfers$/, permission: ACCESS_PERMISSIONS.TRANSFERS_VIEW },
-        { methods: ['POST'], pattern: /^\/create-demo-teachers$/, permission: ACCESS_PERMISSIONS.DEMO_DATA_MANAGE },
         { methods: ['GET'], pattern: /^\/access-control\/matrix$/, permission: ACCESS_PERMISSIONS.ACCESS_MATRIX_VIEW },
         { methods: ['GET'], pattern: /^\/access-control\/my-access$/, permission: ACCESS_PERMISSIONS.USERS_VIEW },
         { methods: ['GET'], pattern: /^\/access-control\/users$/, permission: ACCESS_PERMISSIONS.USERS_VIEW },
@@ -314,6 +314,13 @@ const ACCESS_ROUTE_RULES = {
         { methods: ['GET'], pattern: /^\/grade-queue$/, permission: ACCESS_PERMISSIONS.REPORTS_VIEW },
         { methods: ['GET'], pattern: /^\/grade-analytics$/, permission: ACCESS_PERMISSIONS.REPORTS_VIEW },
         { methods: ['GET'], pattern: /^\/grading-policy$/, permission: ACCESS_PERMISSIONS.REPORTS_VIEW },
+        { methods: ['GET'], pattern: /^\/comment-bank$/, permission: ACCESS_PERMISSIONS.REPORTS_VIEW },
+        { methods: ['POST'], pattern: /^\/comment-bank$/, permission: ACCESS_PERMISSIONS.CLASSES_MANAGE },
+        { methods: ['DELETE'], pattern: /^\/comment-bank\/[^/]+$/, permission: ACCESS_PERMISSIONS.CLASSES_MANAGE },
+        { methods: ['GET'], pattern: /^\/cover-requests$/, permission: ACCESS_PERMISSIONS.CLASSES_VIEW },
+        { methods: ['POST'], pattern: /^\/cover-requests$/, permission: ACCESS_PERMISSIONS.CLASSES_MANAGE },
+        { methods: ['PATCH'], pattern: /^\/cover-requests\/[^/]+$/, permission: ACCESS_PERMISSIONS.CLASSES_MANAGE },
+        { methods: ['GET'], pattern: /^\/activity-timeline$/, permission: ACCESS_PERMISSIONS.REPORTS_VIEW },
         { methods: ['POST'], pattern: /^\/classes\/[^/]+\/grades$/, permission: ACCESS_PERMISSIONS.GRADES_ENTER },
         { methods: ['GET'], pattern: /^\/classes\/[^/]+\/grades$/, permission: ACCESS_PERMISSIONS.REPORTS_VIEW },
         { methods: ['GET'], pattern: /^\/classes\/[^/]+\/students\/[^/]+\/grades$/, permission: ACCESS_PERMISSIONS.REPORTS_VIEW },

@@ -13,11 +13,11 @@ const fs = require('fs');
 // Configuration
 const SQLITE_DB_PATH = path.join(__dirname, '..', 'niemis_demo.db');
 const POSTGRES_CONFIG = {
-    host: 'localhost',
-    port: 5432,
-    database: 'niemis_local',
-    user: 'niemis_admin',
-    password: 'NiEMIS_Admin_2024!',
+    host: process.env.DB_HOST || 'localhost',
+    port: Number(process.env.DB_PORT || 5432),
+    database: process.env.DB_NAME || 'niemis_local',
+    user: process.env.DB_USER || 'niemis_admin',
+    password: process.env.DB_PASSWORD || '',
 };
 
 // Migration utilities
@@ -28,6 +28,10 @@ class DatabaseMigrator {
     }
 
     async connect() {
+        if (!POSTGRES_CONFIG.password) {
+            throw new Error('DB_PASSWORD is required to run migrate-to-postgresql.js');
+        }
+
         // Connect to SQLite
         this.sqliteDb = new sqlite3.Database(SQLITE_DB_PATH, (err) => {
             if (err) {

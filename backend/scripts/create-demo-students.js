@@ -1,7 +1,16 @@
 const { sequelize } = require('../config/database');
 const { User, Student, School, Parish } = require('../models');
 const bcrypt = require('bcryptjs');
+const crypto = require('crypto');
 const logger = require('../utils/logger');
+
+function resolveSeedPassword(envName, prefix) {
+    const fromEnv = typeof process.env[envName] === 'string' ? process.env[envName].trim() : '';
+    if (fromEnv) {
+        return fromEnv;
+    }
+    return `${prefix}-${crypto.randomBytes(8).toString('base64url')}!`;
+}
 
 /**
  * Production-ready script for creating demo student accounts
@@ -9,6 +18,8 @@ const logger = require('../utils/logger');
  */
 class DemoStudentCreator {
     constructor() {
+        this.studentPassword = resolveSeedPassword('DEMO_STUDENT_DEFAULT_PASSWORD', 'Student');
+        this.adminPassword = resolveSeedPassword('DEMO_ADMIN_DEFAULT_PASSWORD', 'Admin');
         this.demoResults = {
             success: false,
             students_created: 0,
@@ -182,7 +193,7 @@ class DemoStudentCreator {
      */
     async createStudentWithUser(studentData, transaction) {
         // Create user account
-        const hashedPassword = await bcrypt.hash('DemoPassword123!', 12);
+        const hashedPassword = await bcrypt.hash(this.studentPassword, 12);
         
         const user = await User.create({
             username: studentData.username,
@@ -234,7 +245,7 @@ class DemoStudentCreator {
                 return adminExists;
             }
             
-            const hashedPassword = await bcrypt.hash('AdminPassword123!', 12);
+            const hashedPassword = await bcrypt.hash(this.adminPassword, 12);
             
             const adminUser = await User.create({
                 username: 'admin',
@@ -268,13 +279,13 @@ class DemoStudentCreator {
             },
             credentials: {
                 student_login: {
-                    note: 'Use any created student email and password: DemoPassword123!',
-                    example: 'john.smith1@student.niemis.bb / DemoPassword123!'
+                    note: 'Use any created student email and the generated/configured student password.',
+                    example: `john.smith1@student.niemis.bb / ${this.studentPassword}`
                 },
                 admin_login: {
                     username: 'admin',
                     email: 'admin@niemis.bb',
-                    password: 'AdminPassword123!'
+                    password: this.adminPassword
                 }
             }
         };

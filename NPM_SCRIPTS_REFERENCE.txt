@@ -1,0 +1,121 @@
+﻿NiEMIS Script Reference
+Generated: 2026-03-03
+
+How to use
+1) Open terminal at project root: c:\Users\SamuelLowe\NiEMIS
+2) Run commands exactly as listed
+3) For backend-only or frontend-only scripts, run from that folder
+
+Quick test checklist
+1) Root smoke tests: npm run test:all
+2) Backend API tests: cd backend && npm run test:api
+3) Backend DB tests: cd backend && npm run test:database
+4) Frontend tests: cd frontend && npm run test
+5) Frontend build: cd frontend && npm run build
+
+ROOT package.json scripts
+Run from: c:\Users\SamuelLowe\NiEMIS
+
+npm run dev  ->  node local-deployment/local-development.js dev
+npm run setup  ->  node local-deployment/local-development.js setup
+npm run start  ->  node local-deployment/local-development.js start
+npm run stop  ->  node local-deployment/local-development.js stop
+npm run health  ->  node local-deployment/local-development.js health
+npm run dev:backend  ->  cd backend && npm run dev
+npm run dev:frontend  ->  cd frontend && npm run dev
+npm run start:production  ->  NODE_ENV=production npm run start
+npm run install:all  ->  npm install && cd backend && npm install && cd ../frontend && npm install
+npm run clean  ->  rm -rf node_modules backend/node_modules frontend/node_modules
+npm run setup:db  ->  cd backend && npm run db:setup
+npm run db:migrate  ->  cd backend && npm run migrate
+npm run db:seed  ->  cd backend && npm run seed:production
+npm run db:reset  ->  cd backend && npm run db:reset
+npm run db:backup  ->  cd backend && npm run backup
+npm run db:restore  ->  cd backend && npm run restore
+npm run test:backend  ->  cd backend && npm run test
+npm run test:frontend  ->  cd frontend && npm run test
+npm run test:all  ->  npm run test:backend && npm run test:frontend
+npm run build  ->  cd frontend && npm run build
+npm run qa:roles  ->  node local-deployment/smoke-role-audit.js
+npm run release:check:local  ->  node local-deployment/local-release-check.js
+npm run build:production  ->  NODE_ENV=production npm run build
+npm run format  ->  cd backend && npm run format && cd ../frontend && npm run format
+npm run lint  ->  cd backend && npm run lint && cd ../frontend && npm run lint
+npm run pre-commit  ->  npm run format && npm run lint && npm run test:all
+npm run docker:local  ->  docker-compose -f local-deployment/docker-compose.local.yml up -d
+npm run docker:stop  ->  docker-compose -f local-deployment/docker-compose.local.yml down
+npm run docker:rebuild  ->  docker-compose -f local-deployment/docker-compose.local.yml up -d --build
+npm run ssl:setup  ->  cd local-deployment && ./local-ssl-setup.sh
+npm run test:connection  ->  cd backend && node test-connection.js
+
+BACKEND package.json scripts
+Run from: c:\Users\SamuelLowe\NiEMIS\backend
+
+npm run start  ->  node server.js
+npm run render:start  ->  NODE_ENV=production npm run migrate && npm run start
+npm run build  ->  echo 'Backend build complete - NiEMIS API Server'
+npm run dev  ->  nodemon server.js
+npm run test  ->  jest --runInBand test/smoke
+npm run test:legacy  ->  jest --runInBand
+npm run test:api  ->  jest --runInBand --verbose test/api
+npm run test:database  ->  jest --runInBand test/database
+npm run test:watch  ->  jest --watch
+npm run test:coverage  ->  jest --coverage
+npm run migrate  ->  npx sequelize-cli db:migrate
+npm run migrate:undo  ->  npx sequelize-cli db:migrate:undo
+npm run migrate:undo:all  ->  npx sequelize-cli db:migrate:undo:all
+npm run seed  ->  npx sequelize-cli db:seed:all
+npm run seed:dashboard  ->  node scripts/seed-dashboard-mock-data.js
+npm run seed:classroom-grades  ->  node scripts/seed-classroom-grades.js
+npm run sync:class-enrollment  ->  node scripts/sync-school-class-enrollment.js
+npm run seed:undo  ->  npx sequelize-cli db:seed:undo:all
+npm run seed:production  ->  node scripts/import-barbados-schools.js
+npm run db:setup  ->  npm run migrate && npm run seed:production
+npm run db:reset  ->  npm run migrate:undo:all && npm run migrate && npm run seed:production
+npm run backup  ->  node scripts/backup-database.js backup
+npm run restore  ->  node scripts/backup-database.js restore
+npm run backup:list  ->  node scripts/backup-database.js list
+npm run health:check  ->  node scripts/database-health-check.js
+npm run import:schools  ->  node scripts/import-barbados-schools.js
+npm run create:demo  ->  node scripts/create-demo-students.js
+npm run validate:deployment  ->  node scripts/validate-deployment.js
+npm run postinstall  ->  echo 'Installation complete. Run npm run migrate manually if needed.'
+npm run deploy  ->  npm run db:setup && npm run validate:deployment
+npm run production:start  ->  NODE_ENV=production node server.js
+npm run production:test  ->  NODE_ENV=production npm run test
+npm run logs:error  ->  tail -f logs/error.log
+npm run logs:combined  ->  tail -f logs/combined.log
+npm run security:audit  ->  npm audit --audit-level moderate
+npm run security:fix  ->  npm audit fix
+npm run lint  ->  node --check server.js && node --check routes/teachers.js && node --check seedGradingData.js
+npm run prestart  ->  echo 'Starting NiEMIS Backend API Server...'
+
+FRONTEND package.json scripts
+Run from: c:\Users\SamuelLowe\NiEMIS\frontend
+
+npm run start  ->  vite
+npm run dev  ->  vite
+npm run build  ->  vite build
+npm run build:prod  ->  vite build --mode production
+npm run build:vercel  ->  vite build --mode production
+npm run build:analyze  ->  npm run build && npx vite-bundle-analyzer build/static/js/*.js
+npm run test  ->  vitest run
+npm run test:watch  ->  vitest
+npm run test:coverage  ->  vitest run --coverage
+npm run test:ci  ->  vitest run --reporter=verbose --coverage
+npm run preview  ->  vite preview
+npm run preview:prod  ->  vite preview --mode production
+npm run lint  ->  eslint src --ext .js,.jsx,.ts,.tsx
+npm run lint:fix  ->  eslint src --ext .js,.jsx,.ts,.tsx --fix
+npm run format  ->  prettier --write src/**/*.{js,jsx,ts,tsx,json,css,md}
+npm run format:check  ->  prettier --check src/**/*.{js,jsx,ts,tsx,json,css,md}
+npm run type-check  ->  tsc --noEmit
+npm run clean  ->  rm -rf build node_modules/.vite
+npm run deploy:render  ->  npm run build:prod && echo 'Build ready for Render.com deployment'
+npm run deploy:vercel  ->  npm run build:vercel && echo 'Build ready for Vercel deployment'
+npm run health-check  ->  curl -f http://localhost:3000 || exit 1
+npm run vercel-build  ->  npm run build:vercel
+
+Notes
+- Some scripts use Unix commands like rm, tail, and curl; on Windows PowerShell use Git Bash/WSL if needed.
+- Backend API tests currently pass with: cd backend && npm run test:api

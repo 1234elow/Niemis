@@ -33,15 +33,18 @@ import {
 import { useMutation, useQuery, useQueryClient } from "react-query";
 import { apiService } from "../services/apiService";
 import LoadingSpinner from "../components/LoadingSpinner";
+import { formatBarbadosDateTime } from "../utils/dateTime";
 
 const AccessControlPage = () => {
   const queryClient = useQueryClient();
   const [search, setSearch] = useState("");
+  const [roleFilter, setRoleFilter] = useState("");
   const [page, setPage] = useState(1);
   const [notification, setNotification] = useState(null);
   const [editDialog, setEditDialog] = useState({
     open: false,
     user: null,
+    username: "",
     target_access_role: "",
     school_id: "",
     is_active: true,
@@ -54,6 +57,31 @@ const AccessControlPage = () => {
   const [diffDialog, setDiffDialog] = useState({
     open: false,
     entry: null,
+  });
+  const [createDialog, setCreateDialog] = useState({
+    open: false,
+    username: "",
+    email: "",
+    target_access_role: "school_admin",
+    school_id: "",
+    first_name: "",
+    last_name: "",
+    is_active: true,
+    generate_password: true,
+    password: "",
+  });
+  const [resetDialog, setResetDialog] = useState({
+    open: false,
+    user: null,
+    generate_password: true,
+    password: "",
+  });
+  const [credentialDialog, setCredentialDialog] = useState({
+    open: false,
+    title: "",
+    username: "",
+    password: "",
+    message: "",
   });
 
   const {
@@ -82,12 +110,13 @@ const AccessControlPage = () => {
     isLoading: isLoadingUsers,
     refetch: refetchUsers,
   } = useQuery(
-    ["access-control-users", page, search],
+    ["access-control-users", page, search, roleFilter],
     () =>
       apiService.getAccessControlUsers({
         page,
         limit: 15,
         search: search.trim() || undefined,
+        role: roleFilter || undefined,
       }),
     {
       keepPreviousData: true,
@@ -124,6 +153,7 @@ const AccessControlPage = () => {
         setEditDialog({
           open: false,
           user: null,
+          username: "",
           target_access_role: "",
           school_id: "",
           is_active: true,
@@ -138,6 +168,83 @@ const AccessControlPage = () => {
             mutationError?.response?.data?.error ||
             mutationError?.message ||
             "Failed to update user access.",
+        });
+      },
+    },
+  );
+
+  const createUserMutation = useMutation(
+    (payload) => apiService.createAccessControlUser(payload),
+    {
+      onSuccess: (response) => {
+        setNotification({
+          type: "success",
+          message: "User account created successfully.",
+        });
+        setCreateDialog({
+          open: false,
+          username: "",
+          email: "",
+          target_access_role: "school_admin",
+          school_id: "",
+          first_name: "",
+          last_name: "",
+          is_active: true,
+          generate_password: true,
+          password: "",
+        });
+        setCredentialDialog({
+          open: true,
+          title: "New User Credentials",
+          username: response?.user?.username || "",
+          password: response?.credentials?.password || "",
+          message: response?.credentials?.generated
+            ? "System-generated password created. Share it securely with the user."
+            : "Password set successfully for the new user.",
+        });
+        queryClient.invalidateQueries(["access-control-users"]);
+      },
+      onError: (mutationError) => {
+        setNotification({
+          type: "error",
+          message:
+            mutationError?.response?.data?.error ||
+            mutationError?.message ||
+            "Failed to create user account.",
+        });
+      },
+    },
+  );
+
+  const resetPasswordMutation = useMutation(
+    ({ userId, payload }) => apiService.resetAccessControlUserPassword(userId, payload),
+    {
+      onSuccess: (response) => {
+        setNotification({
+          type: "success",
+          message: "Password reset completed.",
+        });
+        setResetDialog({
+          open: false,
+          user: null,
+          generate_password: true,
+          password: "",
+        });
+        setCredentialDialog({
+          open: true,
+          title: "Reset Password",
+          username: response?.user?.username || "",
+          password: response?.credentials?.password || "",
+          message: "Provide this password securely to the user.",
+        });
+      },
+      onError: (mutationError) => {
+        setNotification({
+          type: "error",
+          message:
+            mutationError?.response?.data?.error ||
+            mutationError?.message ||
+            "Failed to reset password.",
         });
       },
     },
@@ -160,11 +267,13 @@ const AccessControlPage = () => {
   );
 
   const rolesRequiringSchool = new Set(["school_admin", "data_clerk", "teacher"]);
+  const rolesRequiringStaff = new Set(["school_admin", "data_clerk", "teacher"]);
 
   const openEditDialog = (user) => {
     setEditDialog({
       open: true,
       user,
+      username: user.username || "",
       target_access_role: user.access_role || "",
       school_id: user.school_id || "",
       is_active: Boolean(user.is_active),
@@ -175,6 +284,7 @@ const AccessControlPage = () => {
     setEditDialog({
       open: false,
       user: null,
+      username: "",
       target_access_role: "",
       school_id: "",
       is_active: true,
@@ -215,9 +325,83 @@ const AccessControlPage = () => {
     });
   };
 
+  const openCreateDialog = () => {
+    setCreateDialog({
+      open: true,
+      username: "",
+      email: "",
+      target_access_role: "school_admin",
+      school_id: "",
+      first_name: "",
+      last_name: "",
+      is_active: true,
+      generate_password: true,
+      password: "",
+    });
+  };
+
+  const closeCreateDialog = () => {
+    setCreateDialog((prev) => ({ ...prev, open: false }));
+  };
+
+  const openResetDialog = (user) => {
+    setResetDialog({
+      open: true,
+      user,
+      generate_password: true,
+      password: "",
+    });
+  };
+
+  const closeResetDialog = () => {
+    setResetDialog({
+      open: false,
+      user: null,
+      generate_password: true,
+      password: "",
+    });
+  };
+
+  const handleCreateUser = () => {
+    const payload = {
+      username: createDialog.username.trim(),
+      email: createDialog.email.trim(),
+      target_access_role: createDialog.target_access_role,
+      is_active: Boolean(createDialog.is_active),
+    };
+
+    if (rolesRequiringSchool.has(createDialog.target_access_role)) {
+      payload.school_id = createDialog.school_id;
+    }
+    if (rolesRequiringStaff.has(createDialog.target_access_role)) {
+      payload.first_name = createDialog.first_name.trim();
+      payload.last_name = createDialog.last_name.trim();
+    }
+    if (!createDialog.generate_password && createDialog.password.trim()) {
+      payload.password = createDialog.password;
+    }
+
+    createUserMutation.mutate(payload);
+  };
+
+  const handleResetPassword = () => {
+    if (!resetDialog.user) return;
+    const payload = {
+      generate_password: Boolean(resetDialog.generate_password),
+    };
+    if (!resetDialog.generate_password && resetDialog.password.trim()) {
+      payload.password = resetDialog.password;
+    }
+    resetPasswordMutation.mutate({
+      userId: resetDialog.user.id,
+      payload,
+    });
+  };
+
   const handleSave = () => {
     if (!editDialog.user) return;
     const payload = {
+      username: editDialog.username.trim(),
       target_access_role: editDialog.target_access_role,
       is_active: Boolean(editDialog.is_active),
     };
@@ -233,10 +417,7 @@ const AccessControlPage = () => {
   const historyRows = userHistoryData?.history || [];
   const historyPagination = userHistoryData?.pagination || {};
   const formatHistoryDate = (value) => {
-    if (!value) return "Unknown time";
-    const parsed = new Date(value);
-    if (Number.isNaN(parsed.getTime())) return "Unknown time";
-    return parsed.toLocaleString();
+    return formatBarbadosDateTime(value);
   };
   const formatActionLabel = (action) =>
     String(action || "unknown")
@@ -321,6 +502,20 @@ const AccessControlPage = () => {
       .filter((row) => valueFingerprint(row.oldValue) !== valueFingerprint(row.newValue));
   }, [diffDialog.entry]);
 
+  const createRequiresSchool = rolesRequiringSchool.has(createDialog.target_access_role);
+  const createRequiresStaff = rolesRequiringStaff.has(createDialog.target_access_role);
+  const canSubmitCreate =
+    Boolean(createDialog.username.trim()) &&
+    Boolean(createDialog.email.trim()) &&
+    Boolean(createDialog.target_access_role) &&
+    (!createRequiresSchool || Boolean(createDialog.school_id)) &&
+    (!createRequiresStaff ||
+      (Boolean(createDialog.first_name.trim()) && Boolean(createDialog.last_name.trim()))) &&
+    (createDialog.generate_password || Boolean(createDialog.password.trim()));
+  const canSubmitReset =
+    Boolean(resetDialog.user?.id) &&
+    (resetDialog.generate_password || Boolean(resetDialog.password.trim()));
+
   if (isLoading || isLoadingMyAccess || isLoadingUsers) {
     return <LoadingSpinner />;
   }
@@ -402,6 +597,28 @@ const AccessControlPage = () => {
             }}
             fullWidth
           />
+          <FormControl size="small" sx={{ minWidth: 170 }}>
+            <InputLabel id="role-filter-label">Role</InputLabel>
+            <Select
+              labelId="role-filter-label"
+              label="Role"
+              value={roleFilter}
+              onChange={(event) => {
+                setRoleFilter(event.target.value);
+                setPage(1);
+              }}
+            >
+              <MenuItem value="">All roles</MenuItem>
+              <MenuItem value="super_admin">Super Admin</MenuItem>
+              <MenuItem value="admin">Admin</MenuItem>
+              <MenuItem value="teacher">Teacher</MenuItem>
+              <MenuItem value="parent">Parent</MenuItem>
+              <MenuItem value="student">Student</MenuItem>
+            </Select>
+          </FormControl>
+          <Button variant="contained" onClick={openCreateDialog}>
+            Create User
+          </Button>
           <Button variant="outlined" onClick={() => refetchUsers()}>
             Refresh
           </Button>
@@ -447,6 +664,9 @@ const AccessControlPage = () => {
                 </TableCell>
                 <TableCell align="right">
                   <Stack direction="row" spacing={1} justifyContent="flex-end">
+                    <Button size="small" variant="outlined" onClick={() => openResetDialog(user)}>
+                      Reset Password
+                    </Button>
                     <Button size="small" variant="outlined" onClick={() => openHistoryDialog(user)}>
                       History
                     </Button>
@@ -499,9 +719,14 @@ const AccessControlPage = () => {
           <Stack spacing={2}>
             <TextField
               label="Username"
-              value={editDialog.user?.username || ""}
+              value={editDialog.username}
               size="small"
-              InputProps={{ readOnly: true }}
+              onChange={(event) =>
+                setEditDialog((prev) => ({
+                  ...prev,
+                  username: event.target.value,
+                }))
+              }
             />
 
             <FormControl size="small" fullWidth>
@@ -580,11 +805,246 @@ const AccessControlPage = () => {
             onClick={handleSave}
             disabled={
               updateUserMutation.isLoading ||
+              !editDialog.username.trim() ||
               (rolesRequiringSchool.has(editDialog.target_access_role) &&
                 !editDialog.school_id)
             }
           >
             {updateUserMutation.isLoading ? "Saving..." : "Save Changes"}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      <Dialog open={createDialog.open} onClose={closeCreateDialog} fullWidth maxWidth="sm">
+        <DialogTitle>Create User Account</DialogTitle>
+        <DialogContent dividers>
+          <Stack spacing={2}>
+            <TextField
+              label="Username"
+              size="small"
+              value={createDialog.username}
+              onChange={(event) =>
+                setCreateDialog((prev) => ({ ...prev, username: event.target.value }))
+              }
+              required
+            />
+            <TextField
+              label="Email"
+              size="small"
+              type="email"
+              value={createDialog.email}
+              onChange={(event) =>
+                setCreateDialog((prev) => ({ ...prev, email: event.target.value }))
+              }
+              required
+            />
+
+            <FormControl size="small" fullWidth>
+              <InputLabel id="create-target-access-role-label">Access Role</InputLabel>
+              <Select
+                labelId="create-target-access-role-label"
+                label="Access Role"
+                value={createDialog.target_access_role}
+                onChange={(event) =>
+                  setCreateDialog((prev) => ({
+                    ...prev,
+                    target_access_role: event.target.value,
+                  }))
+                }
+              >
+                {roleOptions.map((option) => (
+                  <MenuItem key={option.value} value={option.value}>
+                    {option.label}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+
+            <FormControl size="small" fullWidth disabled={!createRequiresSchool}>
+              <InputLabel id="create-target-school-label">School Assignment</InputLabel>
+              <Select
+                labelId="create-target-school-label"
+                label="School Assignment"
+                value={createDialog.school_id || ""}
+                onChange={(event) =>
+                  setCreateDialog((prev) => ({ ...prev, school_id: event.target.value }))
+                }
+              >
+                <MenuItem value="">
+                  <em>Not set</em>
+                </MenuItem>
+                {schoolOptions.map((school) => (
+                  <MenuItem key={school.id} value={school.id}>
+                    {school.name}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+
+            {createRequiresStaff && (
+              <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
+                <TextField
+                  label="First Name"
+                  size="small"
+                  value={createDialog.first_name}
+                  onChange={(event) =>
+                    setCreateDialog((prev) => ({ ...prev, first_name: event.target.value }))
+                  }
+                  required
+                  fullWidth
+                />
+                <TextField
+                  label="Last Name"
+                  size="small"
+                  value={createDialog.last_name}
+                  onChange={(event) =>
+                    setCreateDialog((prev) => ({ ...prev, last_name: event.target.value }))
+                  }
+                  required
+                  fullWidth
+                />
+              </Stack>
+            )}
+
+            <FormControlLabel
+              control={
+                <Switch
+                  checked={Boolean(createDialog.generate_password)}
+                  onChange={(event) =>
+                    setCreateDialog((prev) => ({
+                      ...prev,
+                      generate_password: event.target.checked,
+                    }))
+                  }
+                />
+              }
+              label="Generate system password"
+            />
+
+            {!createDialog.generate_password && (
+              <TextField
+                label="Set Password"
+                size="small"
+                type="password"
+                value={createDialog.password}
+                onChange={(event) =>
+                  setCreateDialog((prev) => ({ ...prev, password: event.target.value }))
+                }
+                helperText="Minimum 8 characters."
+                required
+              />
+            )}
+
+            <FormControlLabel
+              control={
+                <Switch
+                  checked={Boolean(createDialog.is_active)}
+                  onChange={(event) =>
+                    setCreateDialog((prev) => ({
+                      ...prev,
+                      is_active: event.target.checked,
+                    }))
+                  }
+                />
+              }
+              label="Account is active"
+            />
+          </Stack>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={closeCreateDialog}>Cancel</Button>
+          <Button
+            variant="contained"
+            onClick={handleCreateUser}
+            disabled={!canSubmitCreate || createUserMutation.isLoading}
+          >
+            {createUserMutation.isLoading ? "Creating..." : "Create User"}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      <Dialog open={resetDialog.open} onClose={closeResetDialog} fullWidth maxWidth="sm">
+        <DialogTitle>
+          Reset Password {resetDialog.user ? `- ${resetDialog.user.username}` : ""}
+        </DialogTitle>
+        <DialogContent dividers>
+          <Stack spacing={2}>
+            <Alert severity="info">
+              Use this for forgotten passwords. A new password will replace the current one
+              immediately.
+            </Alert>
+
+            <FormControlLabel
+              control={
+                <Switch
+                  checked={Boolean(resetDialog.generate_password)}
+                  onChange={(event) =>
+                    setResetDialog((prev) => ({
+                      ...prev,
+                      generate_password: event.target.checked,
+                    }))
+                  }
+                />
+              }
+              label="Generate system password"
+            />
+
+            {!resetDialog.generate_password && (
+              <TextField
+                label="New Password"
+                size="small"
+                type="password"
+                value={resetDialog.password}
+                onChange={(event) =>
+                  setResetDialog((prev) => ({ ...prev, password: event.target.value }))
+                }
+                helperText="Minimum 8 characters."
+                required
+              />
+            )}
+          </Stack>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={closeResetDialog}>Cancel</Button>
+          <Button
+            variant="contained"
+            onClick={handleResetPassword}
+            disabled={!canSubmitReset || resetPasswordMutation.isLoading}
+          >
+            {resetPasswordMutation.isLoading ? "Resetting..." : "Reset Password"}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      <Dialog
+        open={credentialDialog.open}
+        onClose={() => setCredentialDialog((prev) => ({ ...prev, open: false }))}
+        fullWidth
+        maxWidth="sm"
+      >
+        <DialogTitle>{credentialDialog.title || "Credentials"}</DialogTitle>
+        <DialogContent dividers>
+          <Stack spacing={2}>
+            {credentialDialog.message && (
+              <Alert severity="success">{credentialDialog.message}</Alert>
+            )}
+            <TextField
+              label="Username"
+              value={credentialDialog.username}
+              size="small"
+              InputProps={{ readOnly: true }}
+            />
+            <TextField
+              label="Password"
+              value={credentialDialog.password}
+              size="small"
+              InputProps={{ readOnly: true }}
+            />
+          </Stack>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setCredentialDialog((prev) => ({ ...prev, open: false }))}>
+            Close
           </Button>
         </DialogActions>
       </Dialog>

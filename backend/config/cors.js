@@ -7,6 +7,15 @@ const logger = require('../utils/logger');
 
 const isProduction = process.env.NODE_ENV === 'production';
 const isRender = process.env.RENDER === 'true';
+const strictProductionCors = isProduction && process.env.CORS_STRICT_PRODUCTION !== 'false';
+const allowTempCorsMutationInProduction =
+    process.env.CORS_ALLOW_TEMP_ORIGIN_MUTATION_IN_PRODUCTION === 'true';
+
+const parseCsvOrigins = (value) =>
+    String(value || '')
+        .split(',')
+        .map((entry) => entry.trim())
+        .filter(Boolean);
 
 class CORSManager {
     constructor() {
@@ -21,10 +30,23 @@ class CORSManager {
      * Get trusted domains for the education system
      */
     getTrustedDomains() {
-        const baseDomains = [
-            // Primary application domains
+        const configuredOrigins = [
             process.env.FRONTEND_URL,
             process.env.APP_URL,
+            ...parseCsvOrigins(process.env.CORS_ALLOWED_ORIGINS)
+        ].filter(Boolean);
+
+        if (strictProductionCors) {
+            const strictOrigins = [
+                ...configuredOrigins,
+                ...(isRender ? ['https://niemis-frontend.onrender.com'] : [])
+            ];
+            return Array.from(new Set(strictOrigins));
+        }
+
+        const baseDomains = [
+            // Primary application domains
+            ...configuredOrigins,
             
             // Development domains
             ...(isProduction ? [] : [
@@ -475,6 +497,12 @@ const corsStatsEndpoint = (req, res) => {
  */
 const addTempOriginEndpoint = (req, res) => {
     try {
+        if (isProduction && !allowTempCorsMutationInProduction) {
+            return res.status(403).json({
+                error: 'Temporary CORS origin mutation is disabled in production'
+            });
+        }
+
         const { origin, duration } = req.body;
         
         if (!origin) {
@@ -504,6 +532,12 @@ const addTempOriginEndpoint = (req, res) => {
  */
 const removeTempOriginEndpoint = (req, res) => {
     try {
+        if (isProduction && !allowTempCorsMutationInProduction) {
+            return res.status(403).json({
+                error: 'Temporary CORS origin mutation is disabled in production'
+            });
+        }
+
         const { origin } = req.body;
         
         if (!origin) {

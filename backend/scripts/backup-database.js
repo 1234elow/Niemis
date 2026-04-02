@@ -1,5 +1,5 @@
 const { sequelize } = require('../config/database');
-const { spawn } = require('child_process');
+const { spawn, spawnSync } = require('child_process');
 const fs = require('fs').promises;
 const path = require('path');
 const logger = require('../utils/logger');
@@ -23,6 +23,26 @@ class DatabaseBackupManager {
     }
 
     /**
+     * Resolve normalized DB config from active Sequelize instance
+     */
+    resolveDatabaseConfig() {
+        const dialect = typeof sequelize.getDialect === 'function'
+            ? sequelize.getDialect()
+            : sequelize?.options?.dialect;
+        const options = sequelize?.options || {};
+
+        return {
+            dialect,
+            host: options.host,
+            port: options.port,
+            database: options.database,
+            username: options.username || options.user,
+            password: options.password,
+            storage: options.storage
+        };
+    }
+
+    /**
      * Main backup function
      */
     async createBackup() {
@@ -35,7 +55,7 @@ class DatabaseBackupManager {
             await this.ensureBackupDirectory();
             
             // Determine database type and create backup
-            const dbConfig = sequelize.config;
+            const dbConfig = this.resolveDatabaseConfig();
             const backupFile = await this.createDatabaseBackup(dbConfig);
             
             // Cleanup old backups
@@ -91,6 +111,12 @@ class DatabaseBackupManager {
      */
     async createPostgreSQLBackup(dbConfig, timestamp) {
         const backupFile = path.join(this.backupDir, `niemis_backup_${timestamp}.sql`);
+        const pgDumpPath = this.resolvePgDumpPath();
+
+        if (!pgDumpPath) {
+            logger.warn('pg_dump not found in PATH. Falling back to JSON logical backup.');
+            return this.createPostgreSQLJsonBackup(timestamp);
+        }
         
         // Use DATABASE_URL if available, otherwise construct from config
         const databaseUrl = process.env.DATABASE_URL || 
@@ -109,7 +135,7 @@ class DatabaseBackupManager {
         logger.info('Creating PostgreSQL backup with pg_dump...');
         
         return new Promise((resolve, reject) => {
-            const pgDump = spawn('pg_dump', pgDumpArgs);
+            const pgDump = spawn(pgDumpPath, pgDumpArgs);
             
             let stderr = '';
             
@@ -132,6 +158,71 @@ class DatabaseBackupManager {
                 reject(error);
             });
         });
+    }
+
+    /**
+     * Resolve pg_dump executable path
+     */
+    resolvePgDumpPath() {
+        if (process.env.PG_DUMP_PATH) {
+            return process.env.PG_DUMP_PATH;
+        }
+
+        const whichCommand = process.platform === 'win32' ? 'where' : 'which';
+        const lookup = spawnSync(whichCommand, ['pg_dump'], { encoding: 'utf8' });
+        if (lookup.status === 0 && lookup.stdout) {
+            const candidate = lookup.stdout.split(/\r?\n/).map(line => line.trim()).find(Boolean);
+            if (candidate) {
+                return candidate;
+            }
+        }
+
+        if (process.platform === 'win32') {
+            const commonVersions = ['17', '16', '15', '14', '13', '12'];
+            for (const version of commonVersions) {
+                const candidate = `C:\\Program Files\\PostgreSQL\\${version}\\bin\\pg_dump.exe`;
+                if (require('fs').existsSync(candidate)) {
+                    return candidate;
+                }
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Fallback logical backup for PostgreSQL when pg_dump is unavailable
+     */
+    async createPostgreSQLJsonBackup(timestamp) {
+        const backupFile = path.join(this.backupDir, `niemis_backup_${timestamp}.json`);
+
+        const [tables] = await sequelize.query(`
+            SELECT table_schema, table_name
+            FROM information_schema.tables
+            WHERE table_type = 'BASE TABLE'
+              AND table_schema IN ('school_system', 'public')
+              AND table_name <> 'SequelizeMeta'
+            ORDER BY table_schema, table_name
+        `);
+
+        const payload = {
+            backup_type: 'postgres_json_fallback',
+            generated_at: new Date().toISOString(),
+            table_count: tables.length,
+            tables: {}
+        };
+
+        for (const table of tables) {
+            const schema = table.table_schema;
+            const tableName = table.table_name;
+            const key = `${schema}.${tableName}`;
+            const [rows] = await sequelize.query(`SELECT * FROM "${schema}"."${tableName}"`);
+            payload.tables[key] = rows;
+        }
+
+        await fs.writeFile(backupFile, JSON.stringify(payload, null, 2), 'utf8');
+        logger.info(`PostgreSQL JSON fallback backup created successfully: ${backupFile}`);
+        return backupFile;
     }
 
     /**
@@ -199,7 +290,7 @@ class DatabaseBackupManager {
             // Verify backup file exists
             await fs.access(backupFile);
             
-            const dbConfig = sequelize.config;
+            const dbConfig = this.resolveDatabaseConfig();
             
             if (dbConfig.dialect === 'postgres') {
                 await this.restorePostgreSQLBackup(backupFile, dbConfig);

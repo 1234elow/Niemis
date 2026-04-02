@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   Box,
   TextField,
@@ -35,9 +35,23 @@ const SearchAndFilters = ({
   const [localSearchTerm, setLocalSearchTerm] = useState(searchTerm);
   const [localFilters, setLocalFilters] = useState(filters);
   const [filtersExpanded, setFiltersExpanded] = useState(false);
+  const [parishes, setParishes] = useState([]);
 
   const schoolTypes = apiService.getSchoolTypes();
-  const parishes = apiService.getParishes();
+
+  useEffect(() => {
+    const fetchParishes = async () => {
+      try {
+        const parishData = await apiService.getParishes();
+        setParishes(parishData);
+      } catch (error) {
+        console.error("Error loading parishes:", error);
+        setParishes([]);
+      }
+    };
+
+    fetchParishes();
+  }, []);
 
   const handleSearchChange = (event) => {
     setLocalSearchTerm(event.target.value);

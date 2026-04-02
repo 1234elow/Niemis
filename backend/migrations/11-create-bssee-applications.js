@@ -121,7 +121,7 @@ module.exports = {
         type: Sequelize.UUID,
         allowNull: true,
         references: {
-          model: 'users',
+          model: { tableName: 'users', schema: 'school_system' },
           key: 'id'
         },
         onUpdate: 'CASCADE',
@@ -131,7 +131,7 @@ module.exports = {
         type: Sequelize.UUID,
         allowNull: true,
         references: {
-          model: 'users',
+          model: { tableName: 'users', schema: 'school_system' },
           key: 'id'
         },
         onUpdate: 'CASCADE',

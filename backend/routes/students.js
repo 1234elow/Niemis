@@ -450,7 +450,7 @@ router.get("/:id/academics", async (req, res, next) => {
   }
 });
 
-// Update student profile information (public demo access)
+// Update student profile information
 router.patch(
   "/:id/profile",
   [
@@ -502,11 +502,11 @@ router.patch(
 
       await student.update(updateData);
 
-      // Create audit log (demo mode)
+      // Create audit log
       const { AuditLog } = require("../models");
       try {
         await AuditLog.create({
-          user_id: "demo-user",
+          user_id: req.user.id,
           action: "student_profile_update",
           table_name: "students",
           record_id: student.id,
@@ -516,12 +516,10 @@ router.patch(
           user_agent: req.get("User-Agent"),
         });
       } catch (auditError) {
-        logger.warn("Audit log failed (demo mode):", auditError.message);
+        logger.warn("Audit log failed:", auditError.message);
       }
 
-      logger.info(
-        `Student profile updated: ${student.student_id || id} (demo mode)`,
-      );
+      logger.info(`Student profile updated: ${student.student_id || id} by user ${req.user.id}`);
 
       res.json({
         message: "Student profile updated successfully",
@@ -533,7 +531,7 @@ router.patch(
   },
 );
 
-// Update student health information (public demo access)
+// Update student health information
 router.patch("/:id/health", async (req, res, next) => {
   try {
     const { id } = req.params;
@@ -557,11 +555,11 @@ router.patch("/:id/health", async (req, res, next) => {
       });
     }
 
-    // Create audit log (demo mode)
+    // Create audit log
     const { AuditLog } = require("../models");
     try {
       await AuditLog.create({
-        user_id: "demo-user",
+        user_id: req.user.id,
         action: "student_health_update",
         table_name: "student_health",
         record_id: healthRecord.id,
@@ -570,12 +568,10 @@ router.patch("/:id/health", async (req, res, next) => {
         user_agent: req.get("User-Agent"),
       });
     } catch (auditError) {
-      logger.warn("Audit log failed (demo mode):", auditError.message);
+      logger.warn("Audit log failed:", auditError.message);
     }
 
-    logger.info(
-      `Student health updated: ${student.student_id || id} (demo mode)`,
-    );
+    logger.info(`Student health updated: ${student.student_id || id} by user ${req.user.id}`);
 
     res.json({
       message: "Student health information updated successfully",
@@ -586,7 +582,7 @@ router.patch("/:id/health", async (req, res, next) => {
   }
 });
 
-// Update student family information (public demo access)
+// Update student family information
 router.patch("/:id/family", async (req, res, next) => {
   try {
     const { id } = req.params;
@@ -610,11 +606,11 @@ router.patch("/:id/family", async (req, res, next) => {
       });
     }
 
-    // Create audit log (demo mode)
+    // Create audit log
     const { AuditLog } = require("../models");
     try {
       await AuditLog.create({
-        user_id: "demo-user",
+        user_id: req.user.id,
         action: "student_family_update",
         table_name: "family_social_assessments",
         record_id: familyRecord.id,
@@ -623,12 +619,10 @@ router.patch("/:id/family", async (req, res, next) => {
         user_agent: req.get("User-Agent"),
       });
     } catch (auditError) {
-      logger.warn("Audit log failed (demo mode):", auditError.message);
+      logger.warn("Audit log failed:", auditError.message);
     }
 
-    logger.info(
-      `Student family info updated: ${student.student_id || id} (demo mode)`,
-    );
+    logger.info(`Student family info updated: ${student.student_id || id} by user ${req.user.id}`);
 
     res.json({
       message: "Student family information updated successfully",

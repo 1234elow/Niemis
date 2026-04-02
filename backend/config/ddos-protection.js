@@ -75,7 +75,13 @@ class DDoSProtectionManager {
         }
         
         // Check localhost/private networks
-        if (ip === '127.0.0.1' || ip === '::1' || ip.startsWith('192.168.') || ip.startsWith('10.')) {
+        if (
+            ip === '127.0.0.1' ||
+            ip === '::1' ||
+            ip === '::ffff:127.0.0.1' ||
+            ip.startsWith('192.168.') ||
+            ip.startsWith('10.')
+        ) {
             return true;
         }
         
@@ -109,10 +115,13 @@ class DDoSProtectionManager {
         const blockDuration = duration || this.config.blockDuration;
         
         // Auto-unblock after duration
-        setTimeout(() => {
+        const unblockTimer = setTimeout(() => {
             this.blockedIPs.delete(ip);
             logger.info('IP automatically unblocked', { ip, reason: 'timeout' });
         }, blockDuration);
+        if (typeof unblockTimer.unref === 'function') {
+            unblockTimer.unref();
+        }
         
         logger.logSecurity('ddos_ip_blocked', {
             ip,
@@ -330,9 +339,12 @@ class DDoSProtectionManager {
         suspicious.lastMarked = Date.now();
         
         // Auto-remove after suspicion duration
-        setTimeout(() => {
+        const suspiciousTimer = setTimeout(() => {
             this.suspiciousIPs.delete(ip);
         }, this.config.suspicionDuration);
+        if (typeof suspiciousTimer.unref === 'function') {
+            suspiciousTimer.unref();
+        }
         
         logger.logSecurity('ddos_ip_suspicious', {
             ip,
@@ -448,9 +460,12 @@ class DDoSProtectionManager {
      * Start cleanup interval
      */
     startCleanupInterval() {
-        setInterval(() => {
+        const cleanupTimer = setInterval(() => {
             this.cleanup();
         }, this.config.cleanupInterval);
+        if (typeof cleanupTimer.unref === 'function') {
+            cleanupTimer.unref();
+        }
     }
 
     /**

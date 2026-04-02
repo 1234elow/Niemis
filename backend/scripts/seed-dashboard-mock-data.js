@@ -1,4 +1,4 @@
-const { randomUUID } = require("crypto");
+const { randomUUID, randomBytes } = require("crypto");
 const bcrypt = require("bcryptjs");
 const { Op } = require("sequelize");
 const {
@@ -16,7 +16,9 @@ const {
 
 const MARKER = "[DASHBOARD_SEED]";
 const STUDENT_MARKER = "BDS_SEED";
-const DEMO_TEACHER_PASSWORD = "teacher123";
+const DEMO_TEACHER_PASSWORD =
+  (process.env.DEMO_TEACHER_DEFAULT_PASSWORD || "").trim() ||
+  `Teach-${randomBytes(8).toString("base64url")}!`;
 const STUDENTS_PER_SCHOOL = 90;
 
 const BARBADIAN_FIRST_NAMES = [

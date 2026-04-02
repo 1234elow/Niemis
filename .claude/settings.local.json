@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(pkill:*)",
+      "Bash(rm:*)",
+      "Bash(npx sequelize-cli:*)",
+      "Bash(cp:*)",
+      "Bash(npm start)"
+    ],
+    "deny": []
+  }
+}

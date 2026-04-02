@@ -7,6 +7,23 @@ const BarbadosSchoolImporter = require('../services/barbadosSchoolImporter');
 const logger = require('../utils/logger');
 
 const router = express.Router();
+const SCHOOL_TYPE_VALUES = ['pre_primary', 'primary', 'secondary'];
+const SCHOOL_TYPE_INPUT_VALUES = [...SCHOOL_TYPE_VALUES, 'nursery'];
+
+const normalizeSchoolType = (value) => {
+    const normalized = String(value || '').trim().toLowerCase();
+    if (!normalized) return null;
+    if (normalized === 'nursery') return 'pre_primary';
+    if (SCHOOL_TYPE_VALUES.includes(normalized)) return normalized;
+    return null;
+};
+
+const deriveSchoolCategoryFromType = (schoolType) => {
+    if (schoolType === 'pre_primary') return 'nursery';
+    if (schoolType === 'primary') return 'primary';
+    if (schoolType === 'secondary') return 'secondary';
+    return null;
+};
 
 // Get all parishes
 router.get('/parishes', async (req, res, next) => {
@@ -38,7 +55,7 @@ router.get('/zones', async (req, res, next) => {
 router.get('/', [
     query('page').optional().isInt({ min: 1 }).toInt(),
     query('limit').optional().isInt({ min: 1, max: 500 }).toInt(),
-    query('school_type').optional().isIn(['pre_primary', 'primary', 'secondary']),
+    query('school_type').optional().isIn(SCHOOL_TYPE_INPUT_VALUES),
     query('zone_id').optional().isUUID(),
     query('parish_id').optional().isUUID()
 ], async (req, res, next) => {
@@ -65,7 +82,16 @@ router.get('/', [
 
         // Build where clause
         const whereClause = { is_active: true };
-        if (school_type) whereClause.school_type = school_type;
+        if (school_type) {
+            const normalizedSchoolType = normalizeSchoolType(school_type);
+            if (!normalizedSchoolType) {
+                return res.status(400).json({
+                    error: 'Invalid school_type value',
+                    valid_values: SCHOOL_TYPE_INPUT_VALUES
+                });
+            }
+            whereClause.school_type = normalizedSchoolType;
+        }
         if (zone_id) whereClause.zone_id = zone_id;
         if (parish_id) whereClause.parish_id = parish_id;
         
@@ -177,9 +203,9 @@ router.get('/:id', async (req, res, next) => {
 // Create new school (Super Admin/Admin only)
 router.post('/', requireRole(['super_admin', 'admin']), [
     body('name').isLength({ min: 2, max: 200 }),
-    body('school_type').isIn(['pre_primary', 'primary', 'secondary']),
-    body('zone_id').isUUID(),
-    body('parish_id').isUUID(),
+    body('school_type').isIn(SCHOOL_TYPE_INPUT_VALUES),
+    body('zone_id').optional({ checkFalsy: true }).isUUID(),
+    body('parish_id').optional({ checkFalsy: true }).isUUID(),
     body('offers_sixth_form').optional().isBoolean().toBoolean(),
     body('email').optional().isEmail(),
     body('phone').optional().matches(/^[\+]?[0-9\s\-\(\)]+$/),
@@ -194,7 +220,27 @@ router.post('/', requireRole(['super_admin', 'admin']), [
             });
         }
 
-        const school = await School.create(req.body);
+        const normalizedSchoolType = normalizeSchoolType(req.body.school_type);
+        if (!normalizedSchoolType) {
+            return res.status(400).json({
+                error: 'Invalid school_type value',
+                valid_values: SCHOOL_TYPE_INPUT_VALUES
+            });
+        }
+
+        const schoolPayload = {
+            ...req.body,
+            school_type: normalizedSchoolType,
+            school_category: deriveSchoolCategoryFromType(normalizedSchoolType),
+            zone_id: req.body.zone_id || null,
+            parish_id: req.body.parish_id || null
+        };
+
+        if (normalizedSchoolType !== 'secondary') {
+            schoolPayload.offers_sixth_form = false;
+        }
+
+        const school = await School.create(schoolPayload);
 
         logger.info(`New school created: ${school.name} by user ${req.user.id}`);
 
@@ -211,9 +257,9 @@ router.post('/', requireRole(['super_admin', 'admin']), [
 // Update school (Super Admin/Admin only)
 router.put('/:id', requireRole(['super_admin', 'admin']), [
     body('name').optional().isLength({ min: 2, max: 200 }),
-    body('school_type').optional().isIn(['pre_primary', 'primary', 'secondary']),
-    body('zone_id').optional().isUUID(),
-    body('parish_id').optional().isUUID(),
+    body('school_type').optional({ checkFalsy: true }).isIn(SCHOOL_TYPE_INPUT_VALUES),
+    body('zone_id').optional({ checkFalsy: true }).isUUID(),
+    body('parish_id').optional({ checkFalsy: true }).isUUID(),
     body('offers_sixth_form').optional().isBoolean().toBoolean(),
     body('email').optional().isEmail(),
     body('phone').optional().matches(/^[\+]?[0-9\s\-\(\)]+$/),
@@ -235,7 +281,30 @@ router.put('/:id', requireRole(['super_admin', 'admin']), [
             return res.status(404).json({ error: 'School not found' });
         }
 
-        await school.update(req.body);
+        const schoolPayload = { ...req.body };
+        if (Object.prototype.hasOwnProperty.call(schoolPayload, 'zone_id') && !schoolPayload.zone_id) {
+            schoolPayload.zone_id = null;
+        }
+        if (Object.prototype.hasOwnProperty.call(schoolPayload, 'parish_id') && !schoolPayload.parish_id) {
+            schoolPayload.parish_id = null;
+        }
+
+        if (Object.prototype.hasOwnProperty.call(schoolPayload, 'school_type')) {
+            const normalizedSchoolType = normalizeSchoolType(schoolPayload.school_type);
+            if (!normalizedSchoolType) {
+                return res.status(400).json({
+                    error: 'Invalid school_type value',
+                    valid_values: SCHOOL_TYPE_INPUT_VALUES
+                });
+            }
+            schoolPayload.school_type = normalizedSchoolType;
+            schoolPayload.school_category = deriveSchoolCategoryFromType(normalizedSchoolType);
+            if (normalizedSchoolType !== 'secondary') {
+                schoolPayload.offers_sixth_form = false;
+            }
+        }
+
+        await school.update(schoolPayload);
 
         logger.info(`School updated: ${school.name} by user ${req.user.id}`);
 

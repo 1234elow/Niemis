@@ -5,95 +5,14 @@ class ApiService {
     this.api = authService.api;
   }
 
-  // Schools - using public endpoints for now until authentication is properly set up
+  // Schools - use admin API only (database-backed)
   async getSchools(params = {}) {
     try {
-      // Try authenticated endpoint first
       const response = await this.api.get("/admin/schools", { params });
       return response.data;
     } catch (error) {
-      // Fall back to public category-based endpoints
-      console.log("Falling back to public endpoints...");
-
-      // Get all schools by combining category endpoints
-      const categories = ["primary", "secondary", "nursery", "special"];
-      let allSchools = [];
-      let totalCount = 0;
-
-      for (const category of categories) {
-        try {
-          const response = await this.api.get(
-            `/schools/by-category/${category}`,
-            {
-              params: { page: 1, limit: 100 },
-            },
-          );
-          allSchools = allSchools.concat(response.data.schools || []);
-          totalCount += response.data.pagination?.total_count || 0;
-        } catch (catError) {
-          console.warn(`Failed to fetch ${category} schools:`, catError);
-        }
-      }
-
-      // Apply search filter if provided
-      if (params.search) {
-        const searchTerm = params.search.toLowerCase();
-        allSchools = allSchools.filter(
-          (school) =>
-            school.name.toLowerCase().includes(searchTerm) ||
-            (school.principal_name &&
-              school.principal_name.toLowerCase().includes(searchTerm)),
-        );
-        totalCount = allSchools.length;
-      }
-
-      // Apply parish filter if provided
-      if (params.parish) {
-        // Map parish codes to actual parish values in database
-        const parishMap = {
-          st_michael: "SM",
-          christ_church: "CC",
-          st_philip: "SPH",
-          st_james: "SJ",
-          st_john: "SJN",
-          st_andrew: "SA",
-          st_george: "SG",
-          st_peter: "SP",
-          st_lucy: "SL",
-        };
-
-        const actualParishCode = parishMap[params.parish];
-        if (actualParishCode) {
-          allSchools = allSchools.filter(
-            (school) => school.parish === actualParishCode,
-          );
-          totalCount = allSchools.length;
-        }
-      }
-
-      // Apply school_type filter if provided
-      if (params.school_type) {
-        allSchools = allSchools.filter(
-          (school) => school.school_category === params.school_type,
-        );
-        totalCount = allSchools.length;
-      }
-
-      // Implement pagination
-      const page = parseInt(params.page) || 1;
-      const limit = parseInt(params.limit) || 20;
-      const offset = (page - 1) * limit;
-      const paginatedSchools = allSchools.slice(offset, offset + limit);
-
-      return {
-        schools: paginatedSchools,
-        pagination: {
-          current_page: page,
-          total_pages: Math.ceil(totalCount / limit),
-          total_count: totalCount,
-          per_page: limit,
-        },
-      };
+      console.error("Error fetching schools:", error);
+      throw error;
     }
   }
 
@@ -164,11 +83,9 @@ class ApiService {
   // Static data for dropdowns (based on Barbados geography)
   getSchoolTypes() {
     return [
-      { value: "nursery", label: "Pre-Primary/Nursery" },
+      { value: "pre_primary", label: "Pre-Primary/Nursery" },
       { value: "primary", label: "Primary" },
       { value: "secondary", label: "Secondary" },
-      { value: "special", label: "Special" },
-      { value: "tertiary", label: "Tertiary" },
     ];
   }
 
@@ -183,20 +100,7 @@ class ApiService {
       }));
     } catch (error) {
       console.error("Error fetching parishes:", error);
-      // Fallback to static data
-      return [
-        { value: "St. Michael", label: "St. Michael" },
-        { value: "Christ Church", label: "Christ Church" },
-        { value: "St. Philip", label: "St. Philip" },
-        { value: "St. James", label: "St. James" },
-        { value: "St. John", label: "St. John" },
-        { value: "St. Andrew", label: "St. Andrew" },
-        { value: "St. George", label: "St. George" },
-        { value: "St. Peter", label: "St. Peter" },
-        { value: "St. Lucy", label: "St. Lucy" },
-        { value: "St. Joseph", label: "St. Joseph" },
-        { value: "St. Thomas", label: "St. Thomas" },
-      ];
+      throw error;
     }
   }
 
@@ -322,8 +226,71 @@ class ApiService {
     return response.data;
   }
 
+  async getTeacherTransferWorkflow(params = {}) {
+    const response = await this.api.get("/admin/transfers/teachers/workflow", { params });
+    return response.data;
+  }
+
   async updateTransferWorkflow(transferId, payload) {
     const response = await this.api.patch(`/admin/transfers/${transferId}/workflow`, payload);
+    return response.data;
+  }
+
+  async updateTeacherTransferWorkflow(transferId, payload) {
+    const response = await this.api.patch(`/admin/transfers/teachers/${transferId}/workflow`, payload);
+    return response.data;
+  }
+
+  async initiateStudentTransfer(payload) {
+    try {
+      const response = await this.api.post("/admin/transfers/initiate", payload);
+      return response.data;
+    } catch (error) {
+      const routeMissing =
+        error?.response?.status === 404 &&
+        String(error?.response?.data?.code || "").toUpperCase() === "ROUTE_NOT_FOUND";
+      if (!routeMissing) {
+        throw error;
+      }
+      const fallbackResponse = await this.api.post("/admin/transfers", payload);
+      return fallbackResponse.data;
+    }
+  }
+
+  async initiateTeacherTransfer(payload) {
+    try {
+      const response = await this.api.post("/admin/transfers/teachers/initiate", payload);
+      return response.data;
+    } catch (error) {
+      const routeMissing =
+        error?.response?.status === 404 &&
+        String(error?.response?.data?.code || "").toUpperCase() === "ROUTE_NOT_FOUND";
+      if (!routeMissing) {
+        throw error;
+      }
+      try {
+        const fallbackResponse = await this.api.post("/admin/transfers/teachers", payload);
+        return fallbackResponse.data;
+      } catch (fallbackError) {
+        const secondRouteMissing =
+          fallbackError?.response?.status === 404 &&
+          String(fallbackError?.response?.data?.code || "").toUpperCase() === "ROUTE_NOT_FOUND";
+        if (!secondRouteMissing) {
+          throw fallbackError;
+        }
+        const legacyResponse = await this.api.post("/admin/teacher-transfers/initiate", payload);
+        return legacyResponse.data;
+      }
+    }
+  }
+
+  async getStudentDirectory(params = {}) {
+    const response = await this.api.get("/admin/students/directory", { params });
+    return response.data;
+  }
+
+  async getStaffDirectory(params = {}) {
+    const response = await this.api.get("/admin/staff/directory", { params });
     return response.data;
   }
 
@@ -359,6 +326,16 @@ class ApiService {
 
   async getAccessControlUsers(params = {}) {
     const response = await this.api.get("/admin/access-control/users", { params });
+    return response.data;
+  }
+
+  async createAccessControlUser(payload) {
+    const response = await this.api.post("/admin/access-control/users", payload);
+    return response.data;
+  }
+
+  async resetAccessControlUserPassword(userId, payload = {}) {
+    const response = await this.api.post(`/admin/access-control/users/${userId}/reset-password`, payload);
     return response.data;
   }
 
@@ -636,6 +613,76 @@ class ApiService {
       return response.data;
     } catch (error) {
       console.error("Error fetching teacher grade analytics:", error);
+      throw error;
+    }
+  }
+
+  async getTeacherCommentBank() {
+    try {
+      const response = await this.api.get("/teachers/comment-bank");
+      return response.data;
+    } catch (error) {
+      console.error("Error fetching teacher comment bank:", error);
+      throw error;
+    }
+  }
+
+  async saveTeacherCommentTemplate(payload) {
+    try {
+      const response = await this.api.post("/teachers/comment-bank", payload);
+      return response.data;
+    } catch (error) {
+      console.error("Error saving teacher comment template:", error);
+      throw error;
+    }
+  }
+
+  async deleteTeacherCommentTemplate(templateId) {
+    try {
+      const response = await this.api.delete(`/teachers/comment-bank/${templateId}`);
+      return response.data;
+    } catch (error) {
+      console.error("Error deleting teacher comment template:", error);
+      throw error;
+    }
+  }
+
+  async getTeacherCoverRequests() {
+    try {
+      const response = await this.api.get("/teachers/cover-requests");
+      return response.data;
+    } catch (error) {
+      console.error("Error fetching teacher cover requests:", error);
+      throw error;
+    }
+  }
+
+  async createTeacherCoverRequest(payload) {
+    try {
+      const response = await this.api.post("/teachers/cover-requests", payload);
+      return response.data;
+    } catch (error) {
+      console.error("Error creating teacher cover request:", error);
+      throw error;
+    }
+  }
+
+  async updateTeacherCoverRequest(requestId, payload) {
+    try {
+      const response = await this.api.patch(`/teachers/cover-requests/${requestId}`, payload);
+      return response.data;
+    } catch (error) {
+      console.error("Error updating teacher cover request:", error);
+      throw error;
+    }
+  }
+
+  async getTeacherActivityTimeline(params = {}) {
+    try {
+      const response = await this.api.get("/teachers/activity-timeline", { params });
+      return response.data;
+    } catch (error) {
+      console.error("Error fetching teacher activity timeline:", error);
       throw error;
     }
   }

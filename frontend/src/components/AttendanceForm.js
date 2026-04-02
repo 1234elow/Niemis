@@ -80,6 +80,29 @@ const ATTENDANCE_STATUS = [
   },
 ];
 
+const OFFLINE_ATTENDANCE_QUEUE_KEY = "niemis_teacher_attendance_offline_queue";
+
+const readOfflineAttendanceQueue = () => {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = window.localStorage.getItem(OFFLINE_ATTENDANCE_QUEUE_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch (error) {
+    return [];
+  }
+};
+
+const writeOfflineAttendanceQueue = (queue) => {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(OFFLINE_ATTENDANCE_QUEUE_KEY, JSON.stringify(queue));
+  } catch (error) {
+    // Ignore storage errors
+  }
+};
+
 const AttendanceForm = ({ open, onClose, classData, onSuccess }) => {
   const [loading, setLoading] = useState(false);
   const [studentsLoading, setStudentsLoading] = useState(false);
@@ -90,13 +113,26 @@ const AttendanceForm = ({ open, onClose, classData, onSuccess }) => {
   const [notes, setNotes] = useState("");
   const [bulkAction, setBulkAction] = useState("");
   const [selectedAll, setSelectedAll] = useState(false);
+  const [offlineQueueCount, setOfflineQueueCount] = useState(0);
+  const [syncingOffline, setSyncingOffline] = useState(false);
 
   useEffect(() => {
     if (open && classData) {
       loadStudents();
+      refreshOfflineQueueCount();
     } else {
       resetForm();
     }
+  }, [open, classData]);
+
+  useEffect(() => {
+    if (!open) return undefined;
+
+    const onOnline = () => {
+      syncOfflineAttendance();
+    };
+    window.addEventListener("online", onOnline);
+    return () => window.removeEventListener("online", onOnline);
   }, [open, classData]);
 
   const loadStudents = async () => {
@@ -133,6 +169,60 @@ const AttendanceForm = ({ open, onClose, classData, onSuccess }) => {
     setBulkAction("");
     setSelectedAll(false);
     setStudents([]);
+  };
+
+  const refreshOfflineQueueCount = () => {
+    const queue = readOfflineAttendanceQueue();
+    setOfflineQueueCount(queue.length);
+  };
+
+  const queueOfflineAttendance = (payload) => {
+    const queue = readOfflineAttendanceQueue();
+    queue.push({
+      id: `${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+      class_id: classData?.id,
+      class_name: classData?.name || null,
+      payload,
+      queued_at: new Date().toISOString(),
+    });
+    writeOfflineAttendanceQueue(queue);
+    refreshOfflineQueueCount();
+  };
+
+  const syncOfflineAttendance = async () => {
+    if (syncingOffline) return;
+    const queue = readOfflineAttendanceQueue();
+    if (queue.length === 0) {
+      setOfflineQueueCount(0);
+      return;
+    }
+
+    try {
+      setSyncingOffline(true);
+      const remaining = [];
+      let syncedCount = 0;
+
+      for (const item of queue) {
+        try {
+          await apiService.markAttendance(item.class_id, item.payload);
+          syncedCount += 1;
+        } catch (error) {
+          remaining.push(item);
+        }
+      }
+
+      writeOfflineAttendanceQueue(remaining);
+      setOfflineQueueCount(remaining.length);
+
+      if (syncedCount > 0) {
+        toast.success(`Synced ${syncedCount} offline attendance record(s).`);
+      }
+      if (remaining.length > 0) {
+        toast.error(`${remaining.length} offline attendance record(s) still pending sync.`);
+      }
+    } finally {
+      setSyncingOffline(false);
+    }
   };
 
   const handleAttendanceChange = (studentId, status) => {
@@ -237,7 +327,12 @@ const AttendanceForm = ({ open, onClose, classData, onSuccess }) => {
       onClose();
     } catch (error) {
       console.error("Error marking attendance:", error);
-      toast.error("Failed to record attendance. Please try again.");
+      if (!error?.response) {
+        queueOfflineAttendance(payload);
+        toast.success("No network. Attendance saved offline and queued for sync.");
+      } else {
+        toast.error("Failed to record attendance. Please try again.");
+      }
     } finally {
       setLoading(false);
     }
@@ -284,6 +379,25 @@ const AttendanceForm = ({ open, onClose, classData, onSuccess }) => {
                 <Schedule sx={{ mr: 1 }} />
                 Attendance Details
               </Typography>
+
+              {offlineQueueCount > 0 && (
+                <Alert
+                  severity="warning"
+                  sx={{ mb: 2 }}
+                  action={
+                    <Button
+                      color="inherit"
+                      size="small"
+                      onClick={syncOfflineAttendance}
+                      disabled={syncingOffline}
+                    >
+                      {syncingOffline ? "Syncing..." : "Sync now"}
+                    </Button>
+                  }
+                >
+                  {offlineQueueCount} offline attendance record(s) pending sync.
+                </Alert>
+              )}
               
               <Grid container spacing={2} alignItems="center">
                 <Grid item xs={12} sm={4}>

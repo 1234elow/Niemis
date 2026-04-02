@@ -1,0 +1,131 @@
+NiEMIS Feature List (Implemented So Far)
+Updated: 2026-03-02
+
+1. Core Platform and Access
+- Role-based authentication with JWT tokens.
+- Protected route architecture in frontend and backend.
+- Role scopes implemented: super_admin, admin, teacher, parent, student.
+- Role-based dashboard routing (student -> StudentDashboard, teacher -> TeacherDashboard, admin/super_admin -> DashboardPage).
+- Access control middleware with permission matrix and scoped route authorization.
+
+2. Super Admin and Access Control
+- Access Control Matrix page and role-permission visibility.
+- User directory for access control with pagination and search.
+- Role assignment console (access role, school scope, active/inactive status).
+- User access history (audit-backed) with diff view.
+- Create user from super admin UI/API.
+- Auto-generated credentials for new users (or custom password).
+- Forgot-password support via super admin password reset.
+- Username editing for existing users.
+- Role filter in Access Control table (including Student filter).
+
+3. Dashboard and Operations
+- Super Admin command-center style dashboard with metrics and operational panels.
+- Data Quality dashboard with issue listing and workflow actions.
+- Trends and readiness views integrated into admin/super admin experience.
+- Real-time/near-real-time operational refresh support on dashboard panels.
+
+4. Data Quality and Governance
+- Data quality checks and issue tracking APIs.
+- Safe-fix and issue state transitions for tracked issues.
+- Data quality release gate support.
+- Assignee options for issue workflow.
+- Data quality playbooks with preview/apply flow.
+
+5. Audit and Activity Logging
+- Centralized audit logs for key user and data actions.
+- Enhanced audit filters (actor, school, action/event type, path).
+- Teacher-facing timeline (new): attendance submissions, grade submissions, cover requests, comment templates.
+- Access-control user history includes account creation/password reset/audit trail events.
+
+6. Schools, Students, Teachers Domains
+- School management and directory endpoints.
+- Student listing/profile and scoped student access.
+- Teacher profile and class management flows.
+- Staff role updates and school-level staffing controls.
+
+7. Teacher Class Management (My Classes)
+- Teacher class list and class-level workspace.
+- Create class flow with school and grade-level constraints.
+- Delete class flow.
+- Student roster in each class.
+- Student detail access from class context.
+
+8. Timetable and Scheduling
+- Class timetable management per teacher class.
+- Day policy controls with school day start/end, break, lunch windows.
+- Drag-and-drop lesson placement into timetable slots.
+- Custom lesson slot template support.
+- Validation for overlaps and break/lunch conflicts.
+
+9. Attendance
+- Attendance capture per class with status options (present, absent, late, excused).
+- Bulk attendance action support.
+- Attendance summary and processing feedback.
+- Offline attendance queue (new):
+  - Failed submissions (network loss) are saved locally.
+  - Manual sync button for pending offline records.
+  - Auto-sync when browser comes back online while form is open.
+
+10. Grading and Reports
+- Teacher grade entry by class and students.
+- Caribbean-aligned letter grade conversion and score handling.
+- Grade queue (students due for grading) on teacher dashboard.
+- Grade analytics:
+  - total grade distribution,
+  - male vs female comparison,
+  - chronological trend,
+  - class leaders.
+- Class and student grade viewing endpoints for teachers.
+- Report pages and report preview workflows.
+
+11. Grading Policy (Barbados-Oriented)
+- Grading policy service with effective policy resolution by school/school type/grade band.
+- Continuous assessment + end-term weighting logic.
+- Teacher policy preview in dashboard.
+- Admin policy management endpoints.
+
+12. Teacher Workflow Enhancements (Latest)
+- Comment Bank (new):
+  - save reusable report comments,
+  - subject + performance band tagging,
+  - apply template to student notes in grade entry,
+  - delete template.
+- Cover/Substitution Workflow (new):
+  - create cover request with class/date/time/reason/handover notes,
+  - view own requests,
+  - cancel pending request.
+- Teacher Audit Timeline (new): visible in Teacher Dashboard.
+
+13. Student Experience
+- Student profile tab and consolidated student dashboard.
+- Student attendance and grades visibility (self-scoped).
+- Student announcements/updates tab.
+- Profile completion awareness on student side.
+
+14. Security and Hardening Work Completed
+- Removal of hardcoded demo credentials from active scripts and helpers.
+- Environment-driven/generated seed passwords.
+- Debug/demo endpoint exposure reduced with env gating.
+- CORS controls tightened with explicit origin handling options.
+- Migration/model consistency updates for UUID-based user identity and FK alignment.
+
+15. Database and Operations Tooling
+- Migration pipeline updates and successful migration run.
+- Backup utility improvements:
+  - normalized DB config resolution,
+  - pg_dump resolution improvements,
+  - fallback behavior support.
+- One-command local release workflow:
+  - build,
+  - role/audit QA smoke checks,
+  - DB backup snapshot.
+
+16. QA and Build Validation
+- Frontend production build passing after feature updates.
+- Role smoke testing for super_admin/admin/teacher flows.
+- API verification for new access-control and teacher workflow endpoints.
+
+Notes
+- This list reflects implemented features currently present in the codebase and recent completed work.
+- Pending items can be tracked separately in a roadmap/backlog document.

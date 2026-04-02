@@ -204,15 +204,26 @@ const readinessProbe = async (req, res, next) => {
 const databaseHealthCheck = async (req, res, next) => {
     try {
         const startTime = Date.now();
+        const dialect = sequelize.getDialect();
         
         // Test database connection
         await sequelize.authenticate();
         
         // Test a simple query
         const [results] = await sequelize.query('SELECT 1 as test');
-        
-        // Get database stats
-        const dbStats = await sequelize.query('PRAGMA database_list;');
+        const testValue = Number(results?.[0]?.test);
+
+        // Get database stats using dialect-specific query
+        let stats = null;
+        if (dialect === 'sqlite') {
+            const [sqliteStats] = await sequelize.query('PRAGMA database_list;');
+            stats = sqliteStats;
+        } else if (dialect === 'postgres') {
+            const [postgresStats] = await sequelize.query(
+                'SELECT current_database() AS database, current_schema() AS schema, current_user AS user_name;'
+            );
+            stats = postgresStats?.[0] || null;
+        }
         
         const endTime = Date.now();
         const responseTime = endTime - startTime;
@@ -221,17 +232,18 @@ const databaseHealthCheck = async (req, res, next) => {
             status: 'healthy',
             database: {
                 connection: 'active',
-                dialect: sequelize.getDialect(),
+                dialect,
                 version: sequelize.getDatabaseVersion ? await sequelize.getDatabaseVersion() : 'unknown',
                 responseTime: `${responseTime}ms`,
-                testQuery: results[0]?.test === 1 ? 'passed' : 'failed'
+                testQuery: testValue === 1 ? 'passed' : 'failed',
+                stats
             },
             timestamp: new Date().toISOString()
         });
         
         logger.logPerformance('database_health_check', responseTime, {
             status: 'healthy',
-            dialect: sequelize.getDialect()
+            dialect
         });
         
     } catch (error) {

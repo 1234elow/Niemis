@@ -21,6 +21,16 @@ import {
 } from "@mui/material";
 import { apiService } from "../services/apiService";
 
+const normalizeSchoolTypeForForm = (value) => {
+  const normalized = String(value || "").trim().toLowerCase();
+  if (!normalized) return "";
+  if (normalized === "nursery") return "pre_primary";
+  if (["pre_primary", "primary", "secondary"].includes(normalized)) {
+    return normalized;
+  }
+  return "";
+};
+
 const SchoolFormModal = ({
   open,
   onClose,
@@ -44,15 +54,34 @@ const SchoolFormModal = ({
   const [errors, setErrors] = useState({});
   const [loading, setLoading] = useState(false);
   const [submitError, setSubmitError] = useState("");
+  const [parishes, setParishes] = useState([]);
 
   const schoolTypes = apiService.getSchoolTypes();
-  const parishes = apiService.getParishes();
+
+  useEffect(() => {
+    const fetchParishes = async () => {
+      try {
+        const parishData = await apiService.getParishes();
+        setParishes(parishData);
+      } catch (error) {
+        console.error("Error loading parishes:", error);
+        setParishes([]);
+        setSubmitError("Unable to load parish list from database.");
+      }
+    };
+
+    if (open) {
+      fetchParishes();
+    }
+  }, [open]);
 
   useEffect(() => {
     if (school && mode === "edit") {
       setFormData({
         name: school.name || "",
-        school_type: school.school_type || school.school_category || "",
+        school_type: normalizeSchoolTypeForForm(
+          school.school_type || school.school_category,
+        ),
         parish: school.parish || "",
         email: school.email || "",
         phone: school.phone || "",
@@ -145,6 +174,7 @@ const SchoolFormModal = ({
       // Convert capacity to integer if provided
       const schoolData = {
         ...formData,
+        school_type: normalizeSchoolTypeForForm(formData.school_type),
         capacity: formData.capacity ? parseInt(formData.capacity) : null,
       };
 

@@ -70,6 +70,7 @@ const SchoolDetailsModal = ({ open, onClose, school }) => {
 
   const formatSchoolType = (type) => {
     const typeMap = {
+      pre_primary: "Pre-Primary/Nursery",
       nursery: "Pre-Primary/Nursery",
       primary: "Primary",
       secondary: "Secondary",
@@ -81,6 +82,7 @@ const SchoolDetailsModal = ({ open, onClose, school }) => {
 
   const getSchoolTypeColor = (type) => {
     const colorMap = {
+      pre_primary: "info",
       nursery: "info",
       primary: "success",
       secondary: "primary",
@@ -110,10 +112,14 @@ const SchoolDetailsModal = ({ open, onClose, school }) => {
               <Typography variant="h5" component="div">
                 {schoolInfo?.name || "School Details"}
               </Typography>
-              {schoolInfo?.school_category && (
+              {(schoolInfo?.school_type || schoolInfo?.school_category) && (
                 <Chip
-                  label={formatSchoolType(schoolInfo.school_category)}
-                  color={getSchoolTypeColor(schoolInfo.school_category)}
+                  label={formatSchoolType(
+                    schoolInfo.school_type || schoolInfo.school_category,
+                  )}
+                  color={getSchoolTypeColor(
+                    schoolInfo.school_type || schoolInfo.school_category,
+                  )}
                   size="small"
                   sx={{ mt: 1 }}
                 />

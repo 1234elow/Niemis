@@ -23,7 +23,10 @@ class SocketService {
                 throw new Error('No authentication token available');
             }
 
-            const serverUrl = process.env.REACT_APP_SERVER_URL || 'http://localhost:5000';
+            const configuredSocketUrl = import.meta.env.VITE_SOCKET_URL;
+            const configuredApiUrl = import.meta.env.VITE_API_URL;
+            const serverUrl = configuredSocketUrl
+                || (configuredApiUrl ? configuredApiUrl.replace(/\/api\/?$/, '') : window.location.origin);
             
             this.socket = io(serverUrl, {
                 auth: { token },

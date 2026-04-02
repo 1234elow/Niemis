@@ -1,5 +1,7 @@
 const winston = require('winston');
 const path = require('path');
+const isProduction = process.env.NODE_ENV === 'production';
+const isTest = process.env.NODE_ENV === 'test' || Boolean(process.env.JEST_WORKER_ID);
 
 // Create logs directory if it doesn't exist
 const fs = require('fs');
@@ -92,8 +94,8 @@ transports.push(
     })
 );
 
-// Console transport (development and production)
-if (process.env.NODE_ENV !== 'production') {
+// Console transport (development and production, but keep test output quiet)
+if (!isProduction && !isTest) {
     transports.push(
         new winston.transports.Console({
             format: developmentFormat,
@@ -101,7 +103,7 @@ if (process.env.NODE_ENV !== 'production') {
             handleRejections: true
         })
     );
-} else {
+} else if (isProduction) {
     // In production, use structured logging for console
     transports.push(
         new winston.transports.Console({
@@ -228,7 +230,9 @@ const gracefulShutdown = () => {
     logger.end();
 };
 
-process.on('SIGTERM', gracefulShutdown);
-process.on('SIGINT', gracefulShutdown);
+if (!isTest) {
+    process.on('SIGTERM', gracefulShutdown);
+    process.on('SIGINT', gracefulShutdown);
+}
 
 module.exports = logger;

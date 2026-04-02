@@ -1,6 +1,7 @@
 const express = require("express");
 const { body, validationResult, query } = require("express-validator");
 const { Op } = require("sequelize");
+const { randomUUID } = require("crypto");
 const {
   sequelize,
   Staff,
@@ -12,6 +13,7 @@ const {
   User,
   Grade,
   AttendanceRecord,
+  AuditLog,
   Subject,
   Term,
   ClassTimetableSlot,
@@ -38,6 +40,51 @@ const {
 } = require("../services/gradingPolicyService");
 
 const router = express.Router();
+
+const COMMENT_BANK_TABLE = "teacher_comment_templates";
+const COVER_REQUEST_TABLE = "teacher_cover_requests";
+const TIMELINE_DEFAULT_LIMIT = 40;
+
+const resolveAuditCreatedAt = (row) => row?.createdAt || row?.created_at || null;
+
+const normalizeTemplateBand = (value) => {
+  const normalized = String(value || "general")
+    .trim()
+    .toUpperCase();
+  if (!normalized) return "GENERAL";
+  if (["A", "B", "C", "D", "F", "GENERAL"].includes(normalized)) {
+    return normalized;
+  }
+  return "GENERAL";
+};
+
+const summarizeTimelineMessage = (entry) => {
+  const payload = entry.new_values || {};
+  const action = String(entry.action || "");
+
+  if (action === "TEACHER_ATTENDANCE_SUBMITTED") {
+    return `Attendance submitted for ${payload.class_name || "class"} (${payload.records_processed || 0} records).`;
+  }
+  if (action === "TEACHER_GRADES_SUBMITTED") {
+    return `Grades submitted for ${payload.class_name || "class"} (${payload.grades_processed || 0} entries).`;
+  }
+  if (action === "TEACHER_COVER_REQUEST_CREATED") {
+    return `Cover request created for ${payload.class_name || "class"} on ${payload.cover_date || "N/A"}.`;
+  }
+  if (action === "TEACHER_COVER_REQUEST_UPDATED") {
+    return `Cover request updated to ${payload.status || "pending"}.`;
+  }
+  if (action === "TEACHER_COMMENT_TEMPLATE_SAVED") {
+    return `Comment template saved: ${payload.label || "Untitled template"}.`;
+  }
+  if (action === "TEACHER_COMMENT_TEMPLATE_DELETED") {
+    return `Comment template removed.`;
+  }
+  return action
+    .toLowerCase()
+    .replace(/_/g, " ")
+    .replace(/\b\w/g, (character) => character.toUpperCase());
+};
 
 // Helper function to find teacher with fallback lookup
 const findTeacherByUser = async (user) => {
@@ -433,63 +480,6 @@ const getPolicyLessonConflicts = (slots, policyValues) =>
     );
   });
 
-// Simple test route to debug 404 issues
-router.get("/test", (req, res) => {
-  res.json({
-    message: "Teachers route is working!",
-    user: req.user || "No user found",
-    timestamp: new Date().toISOString(),
-  });
-});
-
-// Public diagnostic route to check staff-user relationships (no auth required)
-router.get("/debug-public", async (req, res) => {
-  try {
-    // Get all staff records
-    const staff = await Staff.findAll({
-      attributes: ["id", "user_id", "employee_id", "first_name", "last_name"],
-      limit: 10,
-    });
-
-    // Get all teacher users
-    const teachers = await User.findAll({
-      where: { role: "teacher" },
-      attributes: ["id", "username", "email"],
-    });
-
-    // Current user info
-    const currentUser = req.user
-      ? {
-          id: req.user.id,
-          username: req.user.username,
-          role: req.user.role,
-        }
-      : null;
-
-    res.json({
-      message: "Staff-User relationship debug info",
-      currentUser,
-      staff: staff.map((s) => ({
-        id: s.id,
-        user_id: s.user_id,
-        employee_id: s.employee_id,
-        name: `${s.first_name} ${s.last_name}`,
-      })),
-      teachers: teachers.map((t) => ({
-        id: t.id,
-        username: t.username,
-        email: t.email,
-      })),
-      timestamp: new Date().toISOString(),
-    });
-  } catch (error) {
-    res.status(500).json({
-      error: error.message,
-      message: "Debug endpoint failed",
-    });
-  }
-});
-
 // Teacher-specific routes (for teachers accessing their own data)
 
 // Get current teacher's profile
@@ -533,12 +523,8 @@ router.get("/profile", async (req, res, next) => {
 
       return res.status(404).json({
         error: "Teacher profile not found",
-        debug: {
-          user_id: req.user.id,
-          username: req.user.username,
-          suggestion:
-            "Please contact administrator to link your account to a staff profile",
-        },
+        message:
+          "Please contact administrator to link your account to a staff profile.",
       });
     }
 
@@ -2023,6 +2009,402 @@ router.get("/grade-analytics", async (req, res, next) => {
   }
 });
 
+// Teacher comment bank (reusable report comments by subject/performance band)
+router.get("/comment-bank", async (req, res, next) => {
+  try {
+    if (req.user.role !== "teacher") {
+      return res.status(403).json({ error: "Access denied: Teacher role required" });
+    }
+
+    const teacher = await findTeacherByUser(req.user);
+    if (!teacher) {
+      return res.status(404).json({ error: "Teacher not found" });
+    }
+
+    const logs = await AuditLog.findAll({
+      where: {
+        user_id: req.user.id,
+        table_name: COMMENT_BANK_TABLE,
+        action: {
+          [Op.in]: ["TEACHER_COMMENT_TEMPLATE_SAVED", "TEACHER_COMMENT_TEMPLATE_DELETED"],
+        },
+      },
+      attributes: ["id", "record_id", "action", "new_values", "created_at"],
+      order: [["created_at", "ASC"]],
+    });
+
+    const templateById = new Map();
+    for (const log of logs) {
+      const templateId = String(log.record_id || "");
+      if (!templateId) continue;
+
+      if (log.action === "TEACHER_COMMENT_TEMPLATE_DELETED") {
+        templateById.delete(templateId);
+        continue;
+      }
+
+      const payload = log.new_values || {};
+      templateById.set(templateId, {
+        id: templateId,
+        label: payload.label || "Untitled template",
+        comment_text: payload.comment_text || "",
+        subject: payload.subject || "",
+        performance_band: normalizeTemplateBand(payload.performance_band),
+        is_shared: Boolean(payload.is_shared),
+        school_id: payload.school_id || teacher.school_id,
+        updated_at: resolveAuditCreatedAt(log),
+      });
+    }
+
+    const templates = Array.from(templateById.values()).sort((a, b) =>
+      String(b.updated_at || "").localeCompare(String(a.updated_at || "")),
+    );
+
+    res.json({
+      templates,
+      total_count: templates.length,
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.post("/comment-bank", async (req, res, next) => {
+  try {
+    if (req.user.role !== "teacher") {
+      return res.status(403).json({ error: "Access denied: Teacher role required" });
+    }
+
+    const teacher = await findTeacherByUser(req.user);
+    if (!teacher) {
+      return res.status(404).json({ error: "Teacher not found" });
+    }
+
+    const label = String(req.body?.label || "").trim();
+    const commentText = String(req.body?.comment_text || "").trim();
+    const subject = String(req.body?.subject || "").trim();
+    const performanceBand = normalizeTemplateBand(req.body?.performance_band);
+    const isShared = Boolean(req.body?.is_shared);
+
+    if (!label) {
+      return res.status(400).json({ error: "Template label is required." });
+    }
+    if (!commentText) {
+      return res.status(400).json({ error: "Template comment text is required." });
+    }
+    if (label.length > 80) {
+      return res.status(400).json({ error: "Template label must be 80 characters or less." });
+    }
+    if (commentText.length > 1200) {
+      return res.status(400).json({ error: "Template comment must be 1200 characters or less." });
+    }
+
+    const templateId = randomUUID();
+    const payload = {
+      template_id: templateId,
+      label,
+      comment_text: commentText,
+      subject: subject || null,
+      performance_band: performanceBand,
+      is_shared: isShared,
+      school_id: teacher.school_id,
+      created_by: req.user.id,
+    };
+
+    await AuditLog.create({
+      user_id: req.user.id,
+      action: "TEACHER_COMMENT_TEMPLATE_SAVED",
+      table_name: COMMENT_BANK_TABLE,
+      record_id: templateId,
+      old_values: null,
+      new_values: payload,
+      ip_address: req.ip,
+      user_agent: req.get("User-Agent"),
+    });
+
+    res.status(201).json({
+      message: "Comment template saved successfully.",
+      template: {
+        id: templateId,
+        ...payload,
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.delete("/comment-bank/:templateId", async (req, res, next) => {
+  try {
+    if (req.user.role !== "teacher") {
+      return res.status(403).json({ error: "Access denied: Teacher role required" });
+    }
+
+    const { templateId } = req.params;
+    await AuditLog.create({
+      user_id: req.user.id,
+      action: "TEACHER_COMMENT_TEMPLATE_DELETED",
+      table_name: COMMENT_BANK_TABLE,
+      record_id: templateId,
+      old_values: null,
+      new_values: {
+        template_id: templateId,
+        deleted_by: req.user.id,
+      },
+      ip_address: req.ip,
+      user_agent: req.get("User-Agent"),
+    });
+
+    res.json({ message: "Comment template removed successfully." });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// Teacher cover/substitution workflow
+router.get("/cover-requests", async (req, res, next) => {
+  try {
+    if (req.user.role !== "teacher") {
+      return res.status(403).json({ error: "Access denied: Teacher role required" });
+    }
+
+    const teacher = await findTeacherByUser(req.user);
+    if (!teacher) {
+      return res.status(404).json({ error: "Teacher not found" });
+    }
+
+    const logs = await AuditLog.findAll({
+      where: {
+        user_id: req.user.id,
+        table_name: COVER_REQUEST_TABLE,
+        action: {
+          [Op.in]: ["TEACHER_COVER_REQUEST_CREATED", "TEACHER_COVER_REQUEST_UPDATED"],
+        },
+      },
+      attributes: ["id", "record_id", "action", "new_values", "created_at"],
+      order: [["created_at", "ASC"]],
+    });
+
+    const requestById = new Map();
+    for (const log of logs) {
+      const requestId = String(log.record_id || "");
+      if (!requestId) continue;
+      const payload = log.new_values || {};
+      const existing = requestById.get(requestId) || {};
+      requestById.set(requestId, {
+        ...existing,
+        ...payload,
+        request_id: requestId,
+        updated_at: resolveAuditCreatedAt(log),
+      });
+    }
+
+    const requests = Array.from(requestById.values()).sort((a, b) =>
+      String(b.updated_at || "").localeCompare(String(a.updated_at || "")),
+    );
+
+    res.json({
+      requests,
+      total_count: requests.length,
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.post("/cover-requests", async (req, res, next) => {
+  try {
+    if (req.user.role !== "teacher") {
+      return res.status(403).json({ error: "Access denied: Teacher role required" });
+    }
+
+    const teacher = await findTeacherByUser(req.user);
+    if (!teacher) {
+      return res.status(404).json({ error: "Teacher not found" });
+    }
+
+    const classId = req.body?.class_id;
+    const coverDate = String(req.body?.cover_date || "").trim();
+    const startTime = String(req.body?.start_time || "").trim();
+    const endTime = String(req.body?.end_time || "").trim();
+    const reason = String(req.body?.reason || "").trim();
+    const handoverNotes = String(req.body?.handover_notes || "").trim();
+
+    if (!classId || !coverDate || !startTime || !endTime || !reason) {
+      return res.status(400).json({
+        error: "class_id, cover_date, start_time, end_time, and reason are required.",
+      });
+    }
+
+    const teacherClass = await Class.findOne({
+      where: {
+        id: classId,
+        class_teacher_id: teacher.id,
+        school_id: teacher.school_id,
+        is_active: true,
+      },
+      attributes: ["id", "name", "grade_level", "section"],
+    });
+
+    if (!teacherClass) {
+      return res.status(403).json({ error: "Access denied: Class not assigned to this teacher" });
+    }
+
+    const requestId = randomUUID();
+    const requestPayload = {
+      request_id: requestId,
+      class_id: teacherClass.id,
+      class_name: teacherClass.name,
+      class_grade_level: teacherClass.grade_level,
+      class_section: teacherClass.section,
+      school_id: teacher.school_id,
+      teacher_staff_id: teacher.id,
+      cover_date: coverDate,
+      start_time: startTime,
+      end_time: endTime,
+      reason,
+      handover_notes: handoverNotes || null,
+      status: "pending",
+      submitted_at: new Date().toISOString(),
+    };
+
+    await AuditLog.create({
+      user_id: req.user.id,
+      action: "TEACHER_COVER_REQUEST_CREATED",
+      table_name: COVER_REQUEST_TABLE,
+      record_id: requestId,
+      old_values: null,
+      new_values: requestPayload,
+      ip_address: req.ip,
+      user_agent: req.get("User-Agent"),
+    });
+
+    res.status(201).json({
+      message: "Cover request submitted successfully.",
+      request: requestPayload,
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.patch("/cover-requests/:requestId", async (req, res, next) => {
+  try {
+    if (req.user.role !== "teacher") {
+      return res.status(403).json({ error: "Access denied: Teacher role required" });
+    }
+
+    const { requestId } = req.params;
+    const status = String(req.body?.status || "").trim().toLowerCase();
+    if (!["pending", "cancelled"].includes(status)) {
+      return res.status(400).json({ error: "status must be pending or cancelled" });
+    }
+
+    const logs = await AuditLog.findAll({
+      where: {
+        user_id: req.user.id,
+        table_name: COVER_REQUEST_TABLE,
+        record_id: requestId,
+        action: {
+          [Op.in]: ["TEACHER_COVER_REQUEST_CREATED", "TEACHER_COVER_REQUEST_UPDATED"],
+        },
+      },
+      order: [["created_at", "ASC"]],
+    });
+
+    if (logs.length === 0) {
+      return res.status(404).json({ error: "Cover request not found." });
+    }
+
+    let latest = {};
+    for (const log of logs) {
+      latest = {
+        ...latest,
+        ...(log.new_values || {}),
+      };
+    }
+
+    const nextPayload = {
+      ...latest,
+      status,
+      updated_at: new Date().toISOString(),
+    };
+
+    await AuditLog.create({
+      user_id: req.user.id,
+      action: "TEACHER_COVER_REQUEST_UPDATED",
+      table_name: COVER_REQUEST_TABLE,
+      record_id: requestId,
+      old_values: latest,
+      new_values: nextPayload,
+      ip_address: req.ip,
+      user_agent: req.get("User-Agent"),
+    });
+
+    res.json({
+      message: "Cover request updated successfully.",
+      request: nextPayload,
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// Teacher-facing activity timeline (attendance, grading, cover, templates)
+router.get("/activity-timeline", async (req, res, next) => {
+  try {
+    if (req.user.role !== "teacher") {
+      return res.status(403).json({ error: "Access denied: Teacher role required" });
+    }
+
+    const teacher = await findTeacherByUser(req.user);
+    if (!teacher) {
+      return res.status(404).json({ error: "Teacher not found" });
+    }
+
+    const requestedLimit = Number(req.query?.limit);
+    const limit = Number.isFinite(requestedLimit)
+      ? Math.max(1, Math.min(100, requestedLimit))
+      : TIMELINE_DEFAULT_LIMIT;
+
+    const timelineActions = [
+      "TEACHER_ATTENDANCE_SUBMITTED",
+      "TEACHER_GRADES_SUBMITTED",
+      "TEACHER_COVER_REQUEST_CREATED",
+      "TEACHER_COVER_REQUEST_UPDATED",
+      "TEACHER_COMMENT_TEMPLATE_SAVED",
+      "TEACHER_COMMENT_TEMPLATE_DELETED",
+    ];
+
+    const logs = await AuditLog.findAll({
+      where: {
+        user_id: req.user.id,
+        action: { [Op.in]: timelineActions },
+      },
+      attributes: ["id", "action", "table_name", "record_id", "old_values", "new_values", "created_at"],
+      order: [["created_at", "DESC"]],
+      limit,
+    });
+
+    const timeline = logs.map((entry) => ({
+      id: entry.id,
+      action: entry.action,
+      table_name: entry.table_name,
+      record_id: entry.record_id,
+      happened_at: resolveAuditCreatedAt(entry),
+      message: summarizeTimelineMessage(entry),
+      details: entry.new_values || {},
+    }));
+
+    res.json({
+      timeline,
+      total_count: timeline.length,
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
 // Get students in teacher's specific class
 router.get("/classes/:classId/students", async (req, res, next) => {
   try {
@@ -2241,6 +2623,23 @@ router.post("/classes/:classId/attendance", async (req, res, next) => {
     logger.info(
       `Attendance processed: ${processedRecords.length} successful, ${errors.length} errors`,
     );
+
+    await AuditLog.create({
+      user_id: req.user.id,
+      action: "TEACHER_ATTENDANCE_SUBMITTED",
+      table_name: "attendance_records",
+      record_id: classId,
+      old_values: null,
+      new_values: {
+        class_id: classId,
+        class_name: teacherClass.name,
+        attendance_date,
+        records_processed: processedRecords.length,
+        records_with_errors: errors.length,
+      },
+      ip_address: req.ip,
+      user_agent: req.get("User-Agent"),
+    });
 
     res.json({
       message: "Attendance marking completed",
@@ -2514,6 +2913,26 @@ router.post("/classes/:classId/grades", async (req, res, next) => {
     logger.info(
       `Grades processed: ${processedGrades.length} successful, ${errors.length} errors`,
     );
+
+    await AuditLog.create({
+      user_id: req.user.id,
+      action: "TEACHER_GRADES_SUBMITTED",
+      table_name: "grades",
+      record_id: classId,
+      old_values: null,
+      new_values: {
+        class_id: classId,
+        class_name: teacherClass.name,
+        assessment_name,
+        assessment_type,
+        term_id: currentTerm.id,
+        term_name: currentTerm.name,
+        grades_processed: processedGrades.length,
+        grades_with_errors: errors.length,
+      },
+      ip_address: req.ip,
+      user_agent: req.get("User-Agent"),
+    });
 
     res.json({
       message: "Grade entry completed",

@@ -7,17 +7,7 @@ const getApiUrl = () => {
     return import.meta.env.VITE_API_URL;
   }
 
-  // In local development, use Vite proxy to avoid browser CORS preflight blocks.
-  if (import.meta.env.DEV) {
-    return "/api";
-  }
-
-  // Hosted fallback
-  if (import.meta.env.VITE_VERCEL_ENV) {
-    return "https://niemis-backend.onrender.com/api";
-  }
-
-  // Default same-origin fallback for production-like environments.
+  // Default to same-origin API routing.
   return "/api";
 };
 
@@ -26,7 +16,7 @@ const API_URL = getApiUrl();
 // Log API URL in development for debugging
 if (import.meta.env.VITE_DEBUG_MODE === "true") {
   console.log("API URL:", API_URL);
-  console.log("Environment:", import.meta.env.VITE_VERCEL_ENV || "development");
+  console.log("Environment:", import.meta.env.MODE || "development");
 }
 
 class AuthService {

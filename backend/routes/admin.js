@@ -13,6 +13,7 @@ const {
     User,
     AuditLog,
     StudentTransfer,
+    TeacherTransfer,
     Class,
     AttendanceRecord,
     Facility,
@@ -158,6 +159,14 @@ const formatAuditHistorySummary = (auditRow) => {
         return 'Password changed.';
     }
 
+    if (action === 'USER_PASSWORD_RESET') {
+        return 'Password reset by Super Admin.';
+    }
+
+    if (action === 'USER_ACCOUNT_CREATED_BY_SUPER_ADMIN') {
+        return 'User account created by Super Admin.';
+    }
+
     return action
         .toLowerCase()
         .replace(/_/g, ' ')
@@ -172,6 +181,50 @@ const parseBoolean = (value, fallback = false) => {
     if (['true', '1', 'yes', 'y'].includes(normalized)) return true;
     if (['false', '0', 'no', 'n'].includes(normalized)) return false;
     return fallback;
+};
+
+const ACCESS_ROLE_MUTATION_MAP = {
+    super_admin: { user_role: 'super_admin', staff_role_level: null, requires_staff: false, requires_school: false },
+    ministry_admin: { user_role: 'admin', staff_role_level: 'department_head', requires_staff: false, requires_school: false },
+    school_admin: { user_role: 'admin', staff_role_level: 'principal', requires_staff: true, requires_school: true },
+    data_clerk: { user_role: 'admin', staff_role_level: 'support', requires_staff: true, requires_school: true },
+    teacher: { user_role: 'teacher', staff_role_level: 'teacher', requires_staff: true, requires_school: true },
+    parent: { user_role: 'parent', staff_role_level: null, requires_staff: false, requires_school: false },
+    student: { user_role: 'student', staff_role_level: null, requires_staff: false, requires_school: false }
+};
+
+const ACCESS_ROLE_LABELS = {
+    super_admin: 'Super Admin',
+    ministry_admin: 'Ministry Admin',
+    school_admin: 'School Admin',
+    data_clerk: 'Data Clerk',
+    teacher: 'Teacher',
+    parent: 'Parent',
+    student: 'Student'
+};
+
+const USERNAME_PATTERN = /^[a-zA-Z0-9._-]{3,50}$/;
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+const generateSystemPassword = (prefix = 'NiEMIS') => {
+    const base = crypto.randomBytes(9).toString('base64url');
+    return `${prefix}!${base}9aA`;
+};
+
+const sanitizeNameValue = (value, fallback) => {
+    const normalized = String(value || '').trim();
+    if (!normalized) return fallback;
+    return normalized.slice(0, 50);
+};
+
+const generateEmployeeId = (accessRole) => {
+    const roleToken = String(accessRole || 'STAFF')
+        .toUpperCase()
+        .replace(/[^A-Z]/g, '')
+        .slice(0, 4)
+        .padEnd(4, 'X');
+    const randomToken = crypto.randomBytes(3).toString('hex').toUpperCase();
+    return `${roleToken}-${randomToken}`;
 };
 
 const clampScore = (value) => {
@@ -2980,6 +3033,225 @@ router.get('/access-control/my-access', authMiddleware, requireRole(['super_admi
     }
 });
 
+// Super Admin: create user account with optional generated password
+router.post('/access-control/users', authMiddleware, requireRole(['super_admin']), async (req, res, next) => {
+    const transaction = await sequelize.transaction();
+    try {
+        const username = String(req.body?.username || '').trim();
+        const email = String(req.body?.email || '').trim().toLowerCase();
+        const targetAccessRole = String(req.body?.target_access_role || '').trim();
+        const requestedPassword = String(req.body?.password || '').trim();
+        const schoolId = req.body?.school_id || null;
+        const requestedFirstName = req.body?.first_name || null;
+        const requestedLastName = req.body?.last_name || null;
+        const requestedIsActive = typeof req.body?.is_active === 'boolean' ? req.body.is_active : true;
+
+        if (!USERNAME_PATTERN.test(username)) {
+            await transaction.rollback();
+            return res.status(400).json({
+                error: 'Username must be 3-50 chars and can only include letters, numbers, dot, underscore, and dash.'
+            });
+        }
+
+        if (!EMAIL_PATTERN.test(email)) {
+            await transaction.rollback();
+            return res.status(400).json({
+                error: 'Valid email is required.'
+            });
+        }
+
+        const mutation = ACCESS_ROLE_MUTATION_MAP[targetAccessRole];
+        if (!mutation) {
+            await transaction.rollback();
+            return res.status(400).json({
+                error: 'Invalid target_access_role.',
+                valid_roles: Object.keys(ACCESS_ROLE_MUTATION_MAP)
+            });
+        }
+
+        const existingUser = await User.findOne({
+            where: {
+                [Op.or]: [{ username }, { email }]
+            },
+            attributes: ['id'],
+            transaction
+        });
+        if (existingUser) {
+            await transaction.rollback();
+            return res.status(409).json({
+                error: 'A user with this username or email already exists.'
+            });
+        }
+
+        let school = null;
+        if (mutation.requires_school) {
+            school = await School.findByPk(schoolId, {
+                attributes: ['id', 'name', 'is_active'],
+                transaction
+            });
+            if (!school || !school.is_active) {
+                await transaction.rollback();
+                return res.status(400).json({ error: 'Valid active school is required for this role.' });
+            }
+        }
+
+        const generatedPassword = !requestedPassword;
+        const plainPassword = generatedPassword ? generateSystemPassword('User') : requestedPassword;
+        if (String(plainPassword).length < 8) {
+            await transaction.rollback();
+            return res.status(400).json({
+                error: 'Password must be at least 8 characters.'
+            });
+        }
+
+        const passwordHash = await bcrypt.hash(plainPassword, parseInt(process.env.BCRYPT_ROUNDS, 10) || 12);
+
+        const createdUser = await User.create({
+            username,
+            email,
+            password_hash: passwordHash,
+            role: mutation.user_role,
+            is_active: requestedIsActive
+        }, { transaction });
+
+        let createdStaff = null;
+        if (mutation.requires_staff) {
+            const splitName = username.split(/[._-]+/).filter(Boolean);
+            const fallbackFirst = splitName[0] ? splitName[0].charAt(0).toUpperCase() + splitName[0].slice(1) : 'Staff';
+            const fallbackLast = splitName[1] ? splitName[1].charAt(0).toUpperCase() + splitName[1].slice(1) : 'User';
+            const firstName = sanitizeNameValue(requestedFirstName, fallbackFirst);
+            const lastName = sanitizeNameValue(requestedLastName, fallbackLast);
+
+            let employeeId = generateEmployeeId(targetAccessRole);
+            for (let attempt = 0; attempt < 5; attempt += 1) {
+                const duplicate = await Staff.findOne({
+                    where: { employee_id: employeeId },
+                    attributes: ['id'],
+                    transaction
+                });
+                if (!duplicate) break;
+                employeeId = generateEmployeeId(targetAccessRole);
+            }
+
+            const roleSpecificPosition = targetAccessRole === 'teacher'
+                ? 'Teacher'
+                : (targetAccessRole === 'school_admin' ? 'Principal' : 'Data Clerk');
+            const department = targetAccessRole === 'teacher' ? 'Teaching' : 'Administration';
+
+            createdStaff = await Staff.create({
+                user_id: createdUser.id,
+                school_id: school.id,
+                employee_id: employeeId,
+                first_name: firstName,
+                last_name: lastName,
+                position: roleSpecificPosition,
+                role_level: mutation.staff_role_level,
+                department,
+                hire_date: new Date().toISOString().slice(0, 10),
+                is_active: Boolean(requestedIsActive)
+            }, { transaction });
+        }
+
+        await AuditLog.create({
+            user_id: req.user.id,
+            action: 'USER_ACCOUNT_CREATED_BY_SUPER_ADMIN',
+            table_name: 'users',
+            record_id: createdUser.id,
+            old_values: null,
+            new_values: {
+                username: createdUser.username,
+                email: createdUser.email,
+                role: createdUser.role,
+                target_access_role: targetAccessRole,
+                school_id: createdStaff?.school_id || null,
+                staff_id: createdStaff?.id || null,
+                is_active: Boolean(createdUser.is_active),
+                password_generated: generatedPassword
+            },
+            ip_address: req.ip,
+            user_agent: req.get('User-Agent')
+        }, { transaction });
+
+        await transaction.commit();
+
+        return res.status(201).json({
+            message: 'User created successfully.',
+            user: {
+                id: createdUser.id,
+                username: createdUser.username,
+                email: createdUser.email,
+                role: createdUser.role,
+                access_role: targetAccessRole,
+                school_id: createdStaff?.school_id || null,
+                school_name: school?.name || null,
+                is_active: Boolean(createdUser.is_active)
+            },
+            credentials: {
+                password: plainPassword,
+                generated: generatedPassword
+            }
+        });
+    } catch (error) {
+        await transaction.rollback();
+        next(error);
+    }
+});
+
+// Super Admin: reset user password for forgotten password support
+router.post('/access-control/users/:userId/reset-password', authMiddleware, requireRole(['super_admin']), async (req, res, next) => {
+    try {
+        const { userId } = req.params;
+        const requestedPassword = String(req.body?.password || '').trim();
+        const shouldGenerate = parseBoolean(req.body?.generate_password, true);
+
+        const user = await User.findByPk(userId, {
+            attributes: ['id', 'username', 'email', 'role', 'is_active']
+        });
+        if (!user) {
+            return res.status(404).json({ error: 'User not found.' });
+        }
+
+        const generatedPassword = shouldGenerate || !requestedPassword;
+        const plainPassword = generatedPassword ? generateSystemPassword('Reset') : requestedPassword;
+        if (String(plainPassword).length < 8) {
+            return res.status(400).json({ error: 'Password must be at least 8 characters.' });
+        }
+
+        const passwordHash = await bcrypt.hash(plainPassword, parseInt(process.env.BCRYPT_ROUNDS, 10) || 12);
+        await user.update({ password_hash: passwordHash });
+
+        await AuditLog.create({
+            user_id: req.user.id,
+            action: 'USER_PASSWORD_RESET',
+            table_name: 'users',
+            record_id: user.id,
+            old_values: null,
+            new_values: {
+                username: user.username,
+                target_user_role: user.role,
+                password_generated: generatedPassword
+            },
+            ip_address: req.ip,
+            user_agent: req.get('User-Agent')
+        });
+
+        return res.json({
+            message: 'Password reset successfully.',
+            user: {
+                id: user.id,
+                username: user.username,
+                email: user.email
+            },
+            credentials: {
+                password: plainPassword,
+                generated: generatedPassword
+            }
+        });
+    } catch (error) {
+        next(error);
+    }
+});
+
 // Super Admin: list users and current access assignments
 router.get('/access-control/users', authMiddleware, requireRole(['super_admin']), async (req, res, next) => {
     try {
@@ -3175,7 +3447,9 @@ router.get('/access-control/users/:userId/history', authMiddleware, requireRole(
                     'user_access_assignment_updated',
                     'staff_role_change',
                     'USER_REGISTERED',
-                    'PASSWORD_CHANGED'
+                    'PASSWORD_CHANGED',
+                    'USER_ACCOUNT_CREATED_BY_SUPER_ADMIN',
+                    'USER_PASSWORD_RESET'
                 ]
             };
         }
@@ -3247,6 +3521,9 @@ router.patch('/access-control/users/:userId', authMiddleware, requireRole(['supe
     try {
         const { userId } = req.params;
         const { target_access_role, school_id, is_active } = req.body;
+        const requestedUsername = req.body?.username !== undefined
+            ? String(req.body.username || '').trim()
+            : null;
 
         const user = await User.findByPk(userId, {
             include: [
@@ -3262,20 +3539,31 @@ router.patch('/access-control/users/:userId', authMiddleware, requireRole(['supe
             return res.status(404).json({ error: 'User not found' });
         }
 
-        const ACCESS_ROLE_MUTATION_MAP = {
-            super_admin: { user_role: 'super_admin', staff_role_level: null, requires_staff: false, requires_school: false },
-            ministry_admin: { user_role: 'admin', staff_role_level: 'department_head', requires_staff: false, requires_school: false },
-            school_admin: { user_role: 'admin', staff_role_level: 'principal', requires_staff: true, requires_school: true },
-            data_clerk: { user_role: 'admin', staff_role_level: 'support', requires_staff: true, requires_school: true },
-            teacher: { user_role: 'teacher', staff_role_level: 'teacher', requires_staff: true, requires_school: true },
-            parent: { user_role: 'parent', staff_role_level: null, requires_staff: false, requires_school: false },
-            student: { user_role: 'student', staff_role_level: null, requires_staff: false, requires_school: false }
-        };
-
-        if (!target_access_role && typeof is_active !== 'boolean') {
+        if (!target_access_role && typeof is_active !== 'boolean' && requestedUsername === null) {
             return res.status(400).json({
-                error: 'Provide at least one mutable field: target_access_role or is_active.'
+                error: 'Provide at least one mutable field: target_access_role, is_active, or username.'
             });
+        }
+
+        if (requestedUsername !== null) {
+            if (!USERNAME_PATTERN.test(requestedUsername)) {
+                return res.status(400).json({
+                    error: 'Username must be 3-50 chars and can only include letters, numbers, dot, underscore, and dash.'
+                });
+            }
+
+            const duplicateUser = await User.findOne({
+                where: {
+                    username: requestedUsername,
+                    id: { [Op.ne]: user.id }
+                },
+                attributes: ['id']
+            });
+            if (duplicateUser) {
+                return res.status(409).json({
+                    error: 'Username is already in use by another account.'
+                });
+            }
         }
 
         const mutation = target_access_role ? ACCESS_ROLE_MUTATION_MAP[target_access_role] : null;
@@ -3310,6 +3598,7 @@ router.patch('/access-control/users/:userId', authMiddleware, requireRole(['supe
         }
 
         const beforeState = {
+            username: user.username,
             role: user.role,
             is_active: user.is_active,
             staff_role_level: user?.Staff?.role_level || null,
@@ -3317,6 +3606,9 @@ router.patch('/access-control/users/:userId', authMiddleware, requireRole(['supe
         };
 
         const userPatch = {};
+        if (requestedUsername !== null && requestedUsername !== user.username) {
+            userPatch.username = requestedUsername;
+        }
         if (mutation && user.role !== mutation.user_role) {
             userPatch.role = mutation.user_role;
         }
@@ -3378,6 +3670,7 @@ router.patch('/access-control/users/:userId', authMiddleware, requireRole(['supe
             record_id: refreshedUser.id,
             old_values: beforeState,
             new_values: {
+                username: refreshedUser.username,
                 target_access_role: target_access_role || null,
                 role: refreshedUser.role,
                 is_active: refreshedUser.is_active,
@@ -4331,7 +4624,8 @@ router.get('/students/directory', authMiddleware, requireRole(['super_admin', 'a
 });
 
 // Initiate student transfer
-router.post('/transfers/initiate', authMiddleware, requireRole(['super_admin', 'admin']), async (req, res, next) => {
+// Supports legacy and current paths to avoid client/backend route drift.
+router.post(['/transfers/initiate', '/transfers'], authMiddleware, requireRole(['super_admin', 'admin']), async (req, res, next) => {
     try {
         const {
             student_id,
@@ -4404,6 +4698,428 @@ router.post('/transfers/initiate', authMiddleware, requireRole(['super_admin', '
     }
 });
 
+// Initiate teacher transfer
+// Supports legacy and current paths to avoid client/backend route drift.
+router.post(
+    ['/transfers/teachers/initiate', '/transfers/teachers', '/teacher-transfers/initiate'],
+    authMiddleware,
+    requireRole(['super_admin', 'admin']),
+    async (req, res, next) => {
+    try {
+        const {
+            teacher_id,
+            to_school_id,
+            transfer_reason,
+            effective_date,
+            admin_notes
+        } = req.body;
+
+        if (!teacher_id || !to_school_id || !transfer_reason) {
+            return res.status(400).json({
+                error: 'teacher_id, to_school_id, and transfer_reason are required.'
+            });
+        }
+
+        const requestedSchoolId = req.body?.school_id || null;
+        const scopedSchoolId = resolveScopedSchoolId(req, requestedSchoolId);
+
+        const teacher = await Staff.findByPk(teacher_id, {
+            include: [{ model: School, attributes: ['id', 'name'] }]
+        });
+        if (!teacher) {
+            return res.status(404).json({ error: 'Teacher not found.' });
+        }
+        if (!teacher.is_active) {
+            return res.status(400).json({ error: 'Teacher is inactive and cannot be transferred.' });
+        }
+        if (scopedSchoolId && String(teacher.school_id) !== String(scopedSchoolId)) {
+            return res.status(403).json({
+                error: 'This teacher is outside your school scope.'
+            });
+        }
+        if (String(teacher.school_id) === String(to_school_id)) {
+            return res.status(400).json({ error: 'Teacher is already assigned to this school.' });
+        }
+
+        const toSchool = await School.findByPk(to_school_id, {
+            attributes: ['id', 'name']
+        });
+        if (!toSchool) {
+            return res.status(404).json({ error: 'Target school not found.' });
+        }
+
+        const openTransfer = await TeacherTransfer.findOne({
+            where: {
+                teacher_id,
+                status: { [Op.in]: ['pending', 'approved'] }
+            }
+        });
+        if (openTransfer) {
+            return res.status(409).json({
+                error: 'This teacher already has an active transfer request.'
+            });
+        }
+
+        const transfer = await TeacherTransfer.create({
+            teacher_id,
+            from_school_id: teacher.school_id,
+            to_school_id,
+            initiated_by: req.user.id,
+            transfer_reason,
+            effective_date: effective_date || null,
+            admin_notes: admin_notes || null,
+            status: 'pending'
+        });
+
+        await AuditLog.create({
+            user_id: req.user.id,
+            action: 'teacher_transfer_initiated',
+            table_name: 'teacher_transfers',
+            record_id: transfer.id,
+            new_values: {
+                teacher_id,
+                teacher_name: `${teacher.first_name || ''} ${teacher.last_name || ''}`.trim() || teacher.employee_id,
+                from_school: teacher?.School?.name || null,
+                to_school: toSchool.name,
+                reason: transfer_reason
+            },
+            ip_address: req.ip,
+            user_agent: req.get('User-Agent')
+        });
+
+        res.json({
+            message: 'Teacher transfer initiated successfully.',
+            transfer: await TeacherTransfer.findByPk(transfer.id, {
+                include: [
+                    { model: Staff, as: 'Teacher', attributes: ['id', 'employee_id', 'first_name', 'last_name', 'position'] },
+                    { model: School, as: 'FromSchool', attributes: ['id', 'name'] },
+                    { model: School, as: 'ToSchool', attributes: ['id', 'name'] }
+                ]
+            })
+        });
+    } catch (error) {
+        next(error);
+    }
+});
+
+router.get(
+    ['/transfers/teachers/workflow', '/transfers/teachers', '/teacher-transfers/workflow'],
+    authMiddleware,
+    requireRole(['super_admin', 'admin']),
+    async (req, res, next) => {
+    try {
+        const { page = 1, limit = 25, status, priority, teacher_search } = req.query;
+        const requestedSchoolId = req.query.school_id || null;
+        const schoolId = resolveScopedSchoolId(req, requestedSchoolId);
+        const numericPage = Number(page) > 0 ? Number(page) : 1;
+        const numericLimit = Number(limit) > 0 ? Math.min(Number(limit), 100) : 25;
+        const offset = (numericPage - 1) * numericLimit;
+        const whereClause = {};
+
+        if (status) {
+            whereClause.status = String(status).trim().toLowerCase();
+        }
+        if (schoolId) {
+            whereClause[Op.or] = [
+                { from_school_id: schoolId },
+                { to_school_id: schoolId }
+            ];
+        }
+
+        const transferCreatedField = resolveModelField(TeacherTransfer, ['createdAt', 'created_at'], 'createdAt');
+        const includeClause = [
+            {
+                model: Staff,
+                as: 'Teacher',
+                attributes: ['id', 'employee_id', 'first_name', 'last_name', 'position'],
+                where: teacher_search
+                    ? {
+                        [Op.or]: [
+                            { first_name: { [Op.iLike]: `%${teacher_search}%` } },
+                            { last_name: { [Op.iLike]: `%${teacher_search}%` } },
+                            { employee_id: { [Op.iLike]: `%${teacher_search}%` } }
+                        ]
+                    }
+                    : undefined
+            },
+            { model: School, as: 'FromSchool', attributes: ['id', 'name', 'school_code'], required: false },
+            { model: School, as: 'ToSchool', attributes: ['id', 'name', 'school_code'], required: false }
+        ];
+
+        const rows = await TeacherTransfer.findAndCountAll({
+            where: whereClause,
+            include: includeClause,
+            order: [[transferCreatedField, 'DESC']],
+            limit: numericLimit,
+            offset,
+            distinct: true
+        });
+
+        const now = Date.now();
+        const mappedRows = rows.rows.map((transfer) => {
+            const createdAt = transfer[transferCreatedField] || transfer.createdAt || transfer.created_at;
+            const createdMs = createdAt ? new Date(createdAt).getTime() : now;
+            const ageHours = Math.max(0, (now - createdMs) / (1000 * 60 * 60));
+            const isPending = transfer.status === 'pending';
+            const isApproved = transfer.status === 'approved';
+            const slaHours = isPending ? 72 : isApproved ? 48 : 0;
+            const dueAt = slaHours > 0 ? new Date(createdMs + (slaHours * 60 * 60 * 1000)) : null;
+            const overdue = Boolean(dueAt && dueAt.getTime() < now);
+            const handoverDone = Boolean(transfer.class_handover_completed);
+            const documentsDone = Boolean(transfer.documents_verified);
+
+            let stage = 'queue';
+            if (transfer.status === 'pending') {
+                stage = 'awaiting_approval';
+            } else if (transfer.status === 'approved') {
+                stage = handoverDone && documentsDone ? 'ready_to_complete' : 'handover';
+            } else if (transfer.status === 'completed') {
+                stage = 'closed';
+            } else if (transfer.status === 'rejected') {
+                stage = 'rejected';
+            }
+
+            let priorityBand = 'normal';
+            if (overdue) {
+                priorityBand = 'critical';
+            } else if (isPending && ageHours >= 48) {
+                priorityBand = 'high';
+            } else if (isPending && ageHours >= 24) {
+                priorityBand = 'medium';
+            }
+
+            return {
+                id: transfer.id,
+                teacher_id: transfer.teacher_id,
+                teacher_name: transfer?.Teacher
+                    ? `${transfer.Teacher.first_name || ''} ${transfer.Teacher.last_name || ''}`.trim()
+                    : null,
+                teacher_code: transfer?.Teacher?.employee_id || null,
+                teacher_position: transfer?.Teacher?.position || null,
+                from_school_id: transfer.from_school_id,
+                from_school_name: transfer?.FromSchool?.name || null,
+                to_school_id: transfer.to_school_id,
+                to_school_name: transfer?.ToSchool?.name || null,
+                transfer_reason: transfer.transfer_reason,
+                status: transfer.status,
+                stage,
+                priority: priorityBand,
+                age_hours: Number(ageHours.toFixed(1)),
+                sla_due_at: dueAt ? dueAt.toISOString() : null,
+                is_overdue: overdue,
+                effective_date: transfer.effective_date || null,
+                class_handover_completed: handoverDone,
+                documents_verified: documentsDone,
+                admin_notes: transfer.admin_notes || null,
+                initiated_by: transfer.initiated_by || null,
+                approved_by: transfer.approved_by || null,
+                created_at: createdAt || null,
+                updated_at: transfer.updatedAt || transfer.updated_at || null
+            };
+        });
+
+        const filteredRows = priority
+            ? mappedRows.filter((row) => row.priority === String(priority).trim().toLowerCase())
+            : mappedRows;
+
+        res.json({
+            transfers: filteredRows,
+            pagination: {
+                current_page: numericPage,
+                total_pages: Math.ceil(Number(rows.count || 0) / numericLimit),
+                total_count: Number(rows.count || 0),
+                per_page: numericLimit
+            }
+        });
+    } catch (error) {
+        next(error);
+    }
+});
+
+router.patch('/transfers/teachers/:transferId/workflow', authMiddleware, requireRole(['super_admin', 'admin']), async (req, res, next) => {
+    try {
+        const transfer = await TeacherTransfer.findByPk(req.params.transferId);
+        if (!transfer) {
+            return res.status(404).json({ error: 'Teacher transfer record not found.' });
+        }
+
+        const requestedSchoolId = req.body?.school_id || null;
+        const schoolId = resolveScopedSchoolId(req, requestedSchoolId);
+        if (schoolId && ![String(transfer.from_school_id), String(transfer.to_school_id)].includes(String(schoolId))) {
+            return res.status(403).json({
+                error: 'This transfer is outside your school scope.'
+            });
+        }
+
+        const action = String(req.body?.action || '').trim().toLowerCase();
+        const note = String(req.body?.notes || '').trim();
+        if (!action) {
+            return res.status(400).json({ error: 'action is required.' });
+        }
+
+        const beforeState = {
+            status: transfer.status,
+            class_handover_completed: transfer.class_handover_completed,
+            documents_verified: transfer.documents_verified,
+            effective_date: transfer.effective_date,
+            admin_notes: transfer.admin_notes
+        };
+
+        const updates = {};
+        let completionMeta = null;
+        if (action === 'start_review') {
+            if (transfer.status !== 'pending') {
+                return res.status(400).json({ error: 'Only pending transfers can start review.' });
+            }
+            updates.admin_notes = appendAdminNotes(
+                transfer.admin_notes,
+                `Review started by ${req.user.email || req.user.username || req.user.id} on ${new Date().toISOString().slice(0, 10)}.${note ? ` ${note}` : ''}`
+            );
+        } else if (action === 'approve') {
+            if (transfer.status !== 'pending') {
+                return res.status(400).json({ error: 'Only pending transfers can be approved.' });
+            }
+            updates.status = 'approved';
+            updates.approved_by = req.user.id;
+            updates.transfer_date = new Date().toISOString().slice(0, 10);
+            if (req.body?.effective_date) {
+                updates.effective_date = new Date(req.body.effective_date).toISOString().slice(0, 10);
+            }
+            updates.admin_notes = appendAdminNotes(
+                transfer.admin_notes,
+                `Approved by ${req.user.email || req.user.username || req.user.id}.${note ? ` ${note}` : ''}`
+            );
+        } else if (action === 'reject') {
+            if (!['pending', 'approved'].includes(transfer.status)) {
+                return res.status(400).json({ error: 'Only pending or approved transfers can be rejected.' });
+            }
+            updates.status = 'rejected';
+            updates.approved_by = req.user.id;
+            updates.admin_notes = appendAdminNotes(
+                transfer.admin_notes,
+                `Rejected by ${req.user.email || req.user.username || req.user.id}.${note ? ` ${note}` : ''}`
+            );
+        } else if (action === 'mark_handover') {
+            if (transfer.status !== 'approved') {
+                return res.status(400).json({ error: 'Transfer must be approved before handover can be marked.' });
+            }
+            updates.class_handover_completed = parseBoolean(
+                req.body?.class_handover_completed,
+                Boolean(transfer.class_handover_completed)
+            );
+            updates.documents_verified = parseBoolean(
+                req.body?.documents_verified,
+                Boolean(transfer.documents_verified)
+            );
+            updates.admin_notes = appendAdminNotes(
+                transfer.admin_notes,
+                `Handover checklist updated by ${req.user.email || req.user.username || req.user.id}.${note ? ` ${note}` : ''}`
+            );
+        } else if (action === 'complete') {
+            if (transfer.status !== 'approved') {
+                return res.status(400).json({ error: 'Only approved transfers can be completed.' });
+            }
+            const effectiveHandover = parseBoolean(
+                req.body?.class_handover_completed,
+                Boolean(transfer.class_handover_completed)
+            );
+            const effectiveDocuments = parseBoolean(
+                req.body?.documents_verified,
+                Boolean(transfer.documents_verified)
+            );
+            if (!effectiveHandover || !effectiveDocuments) {
+                return res.status(400).json({
+                    error: 'Class handover and document verification are required before completion.'
+                });
+            }
+
+            updates.class_handover_completed = effectiveHandover;
+            updates.documents_verified = effectiveDocuments;
+            updates.status = 'completed';
+            updates.approved_by = req.user.id;
+            updates.transfer_date = new Date().toISOString().slice(0, 10);
+            if (req.body?.effective_date) {
+                updates.effective_date = new Date(req.body.effective_date).toISOString().slice(0, 10);
+            }
+            updates.admin_notes = appendAdminNotes(
+                transfer.admin_notes,
+                `Marked completed by ${req.user.email || req.user.username || req.user.id}.${note ? ` ${note}` : ''}`
+            );
+
+            await sequelize.transaction(async (transaction) => {
+                await transfer.update(updates, { transaction });
+                const [updatedTeachers] = await Staff.update(
+                    { school_id: transfer.to_school_id },
+                    {
+                        where: { id: transfer.teacher_id, is_active: true },
+                        transaction
+                    }
+                );
+                const [releasedClasses] = await Class.update(
+                    { class_teacher_id: null },
+                    {
+                        where: {
+                            class_teacher_id: transfer.teacher_id,
+                            school_id: transfer.from_school_id,
+                            is_active: true
+                        },
+                        transaction
+                    }
+                );
+                completionMeta = {
+                    teacher_records_updated: Number(updatedTeachers || 0),
+                    source_classes_released: Number(releasedClasses || 0)
+                };
+            });
+        } else if (action === 'reopen') {
+            if (transfer.status !== 'rejected') {
+                return res.status(400).json({ error: 'Only rejected transfers can be reopened.' });
+            }
+            updates.status = 'pending';
+            updates.approved_by = null;
+            updates.admin_notes = appendAdminNotes(
+                transfer.admin_notes,
+                `Reopened by ${req.user.email || req.user.username || req.user.id}.${note ? ` ${note}` : ''}`
+            );
+        } else {
+            return res.status(400).json({
+                error: 'Unsupported workflow action.'
+            });
+        }
+
+        if (action !== 'complete') {
+            await transfer.update(updates);
+        }
+
+        await AuditLog.create({
+            user_id: req.user.id,
+            action: 'teacher_transfer_workflow_updated',
+            table_name: 'teacher_transfers',
+            record_id: transfer.id,
+            old_values: beforeState,
+            new_values: {
+                action,
+                status: transfer.status,
+                class_handover_completed: transfer.class_handover_completed,
+                documents_verified: transfer.documents_verified,
+                effective_date: transfer.effective_date,
+                admin_notes: transfer.admin_notes,
+                ...(completionMeta || {})
+            },
+            ip_address: req.ip,
+            user_agent: req.get('User-Agent')
+        });
+
+        res.json({
+            message: 'Teacher transfer workflow updated successfully.',
+            transfer,
+            ...(completionMeta ? { completion: completionMeta } : {})
+        });
+    } catch (error) {
+        next(error);
+    }
+});
+
 router.get('/transfers/workflow', authMiddleware, requireRole(['super_admin', 'admin']), async (req, res, next) => {
     try {
         const { page = 1, limit = 25, status, priority, student_search } = req.query;
@@ -4439,10 +5155,16 @@ router.get('/transfers/workflow', authMiddleware, requireRole(['super_admin', 'a
                     }
                     : undefined
             },
-            { model: School, as: 'FromSchool', attributes: ['id', 'name', 'school_code'], required: false },
-            { model: School, as: 'ToSchool', attributes: ['id', 'name', 'school_code'], required: false },
-            { model: User, as: 'InitiatedBy', attributes: ['id', 'first_name', 'last_name', 'email'], required: false },
-            { model: User, as: 'ApprovedBy', attributes: ['id', 'first_name', 'last_name', 'email'], required: false }
+            {
+                association: StudentTransfer.associations.FromSchool,
+                attributes: ['id', 'name', 'school_code'],
+                required: false
+            },
+            {
+                association: StudentTransfer.associations.ToSchool,
+                attributes: ['id', 'name', 'school_code'],
+                required: false
+            }
         ];
 
         const rows = await StudentTransfer.findAndCountAll({
@@ -4723,10 +5445,14 @@ router.get('/transfers', authMiddleware, requireRole(['super_admin', 'admin']), 
                     ]
                 } : undefined
             },
-            { model: School, as: 'FromSchool', attributes: ['name', 'parish'] },
-            { model: School, as: 'ToSchool', attributes: ['name', 'parish'] },
-            { model: User, as: 'InitiatedBy', attributes: ['first_name', 'last_name'] },
-            { model: User, as: 'ApprovedBy', attributes: ['first_name', 'last_name'], required: false }
+            {
+                association: StudentTransfer.associations.FromSchool,
+                attributes: ['name', 'parish']
+            },
+            {
+                association: StudentTransfer.associations.ToSchool,
+                attributes: ['name', 'parish']
+            }
         ];
 
         const transfers = await StudentTransfer.findAndCountAll({
@@ -4755,10 +5481,30 @@ router.get('/transfers', authMiddleware, requireRole(['super_admin', 'admin']), 
 // Get audit logs
 router.get('/audit-logs', authMiddleware, requireRole(['super_admin', 'admin']), async (req, res, next) => {
     try {
-        const { page = 1, limit = 50, action, user_id, table_name, date_from, date_to } = req.query;
-        const offset = (page - 1) * limit;
+        const {
+            page = 1,
+            limit = 50,
+            action,
+            user_id,
+            table_name,
+            date_from,
+            date_to,
+            actor_query,
+            school_id,
+            event_type,
+            path_query
+        } = req.query;
+
+        const parsedPage = Math.max(Number.parseInt(page, 10) || 1, 1);
+        const parsedLimit = Math.min(Math.max(Number.parseInt(limit, 10) || 50, 1), 500);
+        const offset = (parsedPage - 1) * parsedLimit;
+        const normalizedActorQuery = String(actor_query || '').trim();
+        const normalizedSchoolId = String(school_id || '').trim();
+        const normalizedPathQuery = String(path_query || '').trim().toLowerCase();
+        const normalizedEventType = String(event_type || '').trim().toLowerCase();
         
         const whereClause = {};
+        const andClauses = [];
         
         if (action) {
             whereClause.action = action;
@@ -4775,279 +5521,149 @@ router.get('/audit-logs', authMiddleware, requireRole(['super_admin', 'admin']),
         if (date_from || date_to) {
             whereClause.created_at = {};
             if (date_from) {
-                whereClause.created_at[Op.gte] = new Date(date_from);
+                const parsedDateFrom = new Date(date_from);
+                if (Number.isNaN(parsedDateFrom.getTime())) {
+                    return res.status(400).json({ error: 'Invalid date_from value.' });
+                }
+                whereClause.created_at[Op.gte] = parsedDateFrom;
             }
             if (date_to) {
-                whereClause.created_at[Op.lte] = new Date(date_to);
+                const parsedDateTo = new Date(date_to);
+                if (Number.isNaN(parsedDateTo.getTime())) {
+                    return res.status(400).json({ error: 'Invalid date_to value.' });
+                }
+                whereClause.created_at[Op.lte] = parsedDateTo;
             }
+        }
+
+        if (normalizedSchoolId) {
+            andClauses.push(
+                sequelize.where(
+                    sequelize.literal(`COALESCE("AuditLog"."new_values"->'audit_context'->>'school_id', '')`),
+                    normalizedSchoolId
+                )
+            );
+        }
+
+        if (normalizedPathQuery) {
+            andClauses.push(
+                sequelize.where(
+                    sequelize.literal(`LOWER(COALESCE("AuditLog"."new_values"->'audit_context'->>'path', ''))`),
+                    { [Op.like]: `%${normalizedPathQuery}%` }
+                )
+            );
+        }
+
+        if (normalizedEventType === 'read') {
+            andClauses.push(
+                sequelize.where(
+                    sequelize.literal(`UPPER(COALESCE("AuditLog"."new_values"->'audit_context'->>'method', ''))`),
+                    'GET'
+                )
+            );
+        } else if (normalizedEventType === 'write') {
+            andClauses.push(
+                sequelize.where(
+                    sequelize.literal(`UPPER(COALESCE("AuditLog"."new_values"->'audit_context'->>'method', ''))`),
+                    {
+                        [Op.in]: ['POST', 'PUT', 'PATCH', 'DELETE']
+                    }
+                )
+            );
+        }
+
+        if (andClauses.length > 0) {
+            whereClause[Op.and] = andClauses;
+        }
+
+        const userInclude = {
+            model: User,
+            attributes: ['id', 'username', 'email', 'role'],
+            required: Boolean(normalizedActorQuery),
+            include: [
+                {
+                    model: Staff,
+                    attributes: ['id', 'school_id'],
+                    required: false,
+                    include: [
+                        {
+                            model: School,
+                            attributes: ['id', 'name'],
+                            required: false
+                        }
+                    ]
+                }
+            ]
+        };
+
+        if (normalizedActorQuery) {
+            userInclude.where = {
+                [Op.or]: [
+                    { username: { [Op.iLike]: `%${normalizedActorQuery}%` } },
+                    { email: { [Op.iLike]: `%${normalizedActorQuery}%` } }
+                ]
+            };
         }
 
         const auditLogs = await AuditLog.findAndCountAll({
             where: whereClause,
-            include: [{ model: User, attributes: ['id', 'username', 'email', 'role'] }],
-            limit: parseInt(limit),
-            offset: parseInt(offset),
+            include: [userInclude],
+            limit: parsedLimit,
+            offset: parseInt(offset, 10),
             order: [['created_at', 'DESC']]
         });
+
+        const actorOptionsMap = new Map();
+        const schoolOptionsMap = new Map();
+        const actionOptionsSet = new Set();
+
+        for (const row of auditLogs.rows) {
+            const actor = row?.User || null;
+            const context = row?.new_values?.audit_context || {};
+            const actorKey = actor?.id ? String(actor.id) : '';
+            const actorLabel = actor?.username || actor?.email || null;
+            const schoolFromContext = context?.school_id ? String(context.school_id) : '';
+            const staffSchool = actor?.Staff?.School || null;
+            const schoolIdValue = schoolFromContext || (staffSchool?.id ? String(staffSchool.id) : '');
+            const schoolNameValue = staffSchool?.name || null;
+
+            if (actorKey && actorLabel && !actorOptionsMap.has(actorKey)) {
+                actorOptionsMap.set(actorKey, {
+                    id: actor.id,
+                    username: actor.username || null,
+                    email: actor.email || null,
+                    role: actor.role || null
+                });
+            }
+
+            if (schoolIdValue && !schoolOptionsMap.has(schoolIdValue)) {
+                schoolOptionsMap.set(schoolIdValue, {
+                    id: schoolIdValue,
+                    name: schoolNameValue
+                });
+            }
+
+            if (row?.action) {
+                actionOptionsSet.add(String(row.action));
+            }
+        }
 
         res.json({
             audit_logs: auditLogs.rows,
             pagination: {
-                current_page: parseInt(page),
-                total_pages: Math.ceil(auditLogs.count / limit),
+                current_page: parsedPage,
+                total_pages: Math.ceil(auditLogs.count / parsedLimit),
                 total_count: auditLogs.count,
-                per_page: parseInt(limit)
+                per_page: parsedLimit
+            },
+            filters: {
+                action_options: Array.from(actionOptionsSet).sort((a, b) => a.localeCompare(b)),
+                actor_options: Array.from(actorOptionsMap.values()),
+                school_options: Array.from(schoolOptionsMap.values())
             }
         });
 
     } catch (error) {
-        next(error);
-    }
-});
-
-// Create demo teacher accounts
-router.post('/create-demo-teachers', authMiddleware, requireRole(['super_admin', 'admin']), async (req, res, next) => {
-    try {
-        logger.info('Creating demo teacher accounts...');
-        
-        // Get some schools to assign teachers to
-        const schools = await School.findAll({ 
-            limit: 3,
-            where: { is_active: true }
-        });
-        
-        if (schools.length === 0) {
-            return res.status(400).json({ error: 'No active schools found. Please import schools first.' });
-        }
-        
-        // Demo teachers data with login credentials
-        const demoTeachers = [
-            {
-                // User account
-                username: 'teacher1',
-                email: 'teacher1@education.gov.bb',
-                password: 'teacher123',
-                role: 'teacher',
-                
-                // Staff details
-                employee_id: 'TCH001',
-                first_name: 'Sarah',
-                last_name: 'Johnson',
-                date_of_birth: '1985-03-15',
-                gender: 'female',
-                phone: '246-123-4567',
-                address: 'Bridgetown, Barbados',
-                position: 'Mathematics Teacher',
-                role_level: 'teacher',
-                department: 'Mathematics',
-                hire_date: '2020-08-01',
-                salary: 45000.00,
-                qualifications: 'Bachelor of Science in Mathematics Education',
-                certifications: 'Certified Mathematics Teacher',
-                school_id: schools[0].id
-            },
-            {
-                // User account
-                username: 'teacher2',
-                email: 'teacher2@education.gov.bb',
-                password: 'teacher123',
-                role: 'teacher',
-                
-                // Staff details
-                employee_id: 'TCH002',
-                first_name: 'Michael',
-                last_name: 'Thompson',
-                date_of_birth: '1982-07-22',
-                gender: 'male',
-                phone: '246-234-5678',
-                address: 'Oistins, Barbados',
-                position: 'English Teacher',
-                role_level: 'teacher',
-                department: 'English Language Arts',
-                hire_date: '2018-09-01',
-                salary: 48000.00,
-                qualifications: 'Master of Arts in English Literature',
-                certifications: 'Certified English Teacher',
-                school_id: schools[1 % schools.length].id
-            },
-            {
-                // User account
-                username: 'teacher3',
-                email: 'teacher3@education.gov.bb',
-                password: 'teacher123',
-                role: 'teacher',
-                
-                // Staff details
-                employee_id: 'TCH003',
-                first_name: 'Patricia',
-                last_name: 'Williams',
-                date_of_birth: '1979-11-08',
-                gender: 'female',
-                phone: '246-345-6789',
-                address: 'Speightstown, Barbados',
-                position: 'Science Teacher',
-                role_level: 'teacher',
-                department: 'Natural Sciences',
-                hire_date: '2015-01-15',
-                salary: 52000.00,
-                qualifications: 'Bachelor of Science in Biology',
-                certifications: 'Certified Science Teacher',
-                school_id: schools[2 % schools.length].id
-            }
-        ];
-        
-        const createdTeachers = [];
-        
-        // Create teachers with user accounts
-        for (const teacherData of demoTeachers) {
-            // Check if user already exists
-            const existingUser = await User.findOne({
-                where: { 
-                    email: teacherData.email
-                }
-            });
-            
-            if (existingUser) {
-                logger.info(`Teacher ${teacherData.username} already exists, skipping...`);
-                continue;
-            }
-            
-            // Create user account
-            const hashedPassword = await bcrypt.hash(teacherData.password, 10);
-            
-            const user = await User.create({
-                username: teacherData.username,
-                email: teacherData.email,
-                password_hash: hashedPassword,
-                role: teacherData.role,
-                is_active: true
-            });
-            
-            // Create staff record
-            const staff = await Staff.create({
-                user_id: user.id,
-                school_id: teacherData.school_id,
-                employee_id: teacherData.employee_id,
-                first_name: teacherData.first_name,
-                last_name: teacherData.last_name,
-                date_of_birth: teacherData.date_of_birth,
-                gender: teacherData.gender,
-                phone: teacherData.phone,
-                address: teacherData.address,
-                position: teacherData.position,
-                role_level: teacherData.role_level,
-                department: teacherData.department,
-                hire_date: teacherData.hire_date,
-                salary: teacherData.salary,
-                qualifications: teacherData.qualifications,
-                certifications: teacherData.certifications,
-                is_active: true
-            });
-
-            const teacherSchool = schools.find(s => s.id === teacherData.school_id);
-            const schoolType = String(teacherSchool?.school_type || '').toLowerCase();
-            
-            // Create demo classes for each teacher
-            const demoClasses = schoolType === 'secondary'
-                ? [
-                    {
-                        name: `${teacherData.department} - Lower`,
-                        grade_level: 'Second Form',
-                        section: 'A',
-                        school_id: teacherData.school_id,
-                        class_teacher_id: staff.id,
-                        capacity: 25,
-                        current_enrollment: 22,
-                        school_year: '2024-2025',
-                        is_active: true
-                    },
-                    {
-                        name: `${teacherData.department} - Upper`,
-                        grade_level: 'Fourth Form',
-                        section: 'B',
-                        school_id: teacherData.school_id,
-                        class_teacher_id: staff.id,
-                        capacity: 30,
-                        current_enrollment: 28,
-                        school_year: '2024-2025',
-                        is_active: true
-                    }
-                ]
-                : [
-                    {
-                        name: `${teacherData.department} - Lower`,
-                        grade_level: 'Class 3',
-                        section: 'A',
-                        school_id: teacherData.school_id,
-                        class_teacher_id: staff.id,
-                        capacity: 25,
-                        current_enrollment: 22,
-                        school_year: '2024-2025',
-                        is_active: true
-                    },
-                    {
-                        name: `${teacherData.department} - Upper`,
-                        grade_level: 'Class 4',
-                        section: 'B',
-                        school_id: teacherData.school_id,
-                        class_teacher_id: staff.id,
-                        capacity: 30,
-                        current_enrollment: 28,
-                        school_year: '2024-2025',
-                        is_active: true
-                    }
-                ];
-            
-            for (const classData of demoClasses) {
-                await Class.create(classData);
-            }
-            
-            createdTeachers.push({
-                user: user,
-                staff: staff,
-                school: teacherSchool,
-                credentials: {
-                    username: teacherData.username,
-                    password: teacherData.password
-                }
-            });
-            
-            // Create audit log
-            await AuditLog.create({
-                user_id: req.user.id,
-                action: 'demo_teacher_created',
-                table_name: 'users',
-                record_id: user.id,
-                new_values: { 
-                    username: teacherData.username,
-                    role: teacherData.role,
-                    employee_id: teacherData.employee_id,
-                    name: `${teacherData.first_name} ${teacherData.last_name}`
-                },
-                ip_address: req.ip,
-                user_agent: req.get('User-Agent')
-            });
-            
-            logger.info(`Created teacher: ${teacherData.first_name} ${teacherData.last_name} (${teacherData.username})`);
-        }
-        
-        logger.info('Demo teacher creation completed');
-        
-        res.json({
-            message: 'Demo teachers created successfully',
-            created_count: createdTeachers.length,
-            teachers: createdTeachers.map(teacher => ({
-                name: `${teacher.staff.first_name} ${teacher.staff.last_name}`,
-                username: teacher.credentials.username,
-                password: teacher.credentials.password,
-                position: teacher.staff.position,
-                school: teacher.school.name,
-                employee_id: teacher.staff.employee_id
-            }))
-        });
-
-    } catch (error) {
-        logger.error('Error creating demo teachers:', error);
         next(error);
     }
 });

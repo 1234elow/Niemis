@@ -14,10 +14,15 @@ import {
   ListItem,
   ListItemIcon,
   ListItemText,
+  MenuItem,
   Paper,
+  Select,
   Skeleton,
   Stack,
+  TextField,
   Typography,
+  FormControl,
+  InputLabel,
 } from "@mui/material";
 import {
   Assessment,
@@ -27,8 +32,10 @@ import {
   Class,
   Grade,
   Group,
+  History,
   Person,
   Schedule,
+  SwapHoriz,
   TrendingUp,
 } from "@mui/icons-material";
 import { useNavigate } from "react-router-dom";
@@ -182,6 +189,17 @@ const TeacherDashboard = () => {
   const [teacherData, setTeacherData] = useState(null);
   const [classes, setClasses] = useState([]);
   const [recentActivities, setRecentActivities] = useState([]);
+  const [coverRequests, setCoverRequests] = useState([]);
+  const [coverSubmitting, setCoverSubmitting] = useState(false);
+  const [activityTimeline, setActivityTimeline] = useState([]);
+  const [coverForm, setCoverForm] = useState({
+    class_id: "",
+    cover_date: new Date().toISOString().slice(0, 10),
+    start_time: "08:00",
+    end_time: "08:40",
+    reason: "",
+    handover_notes: "",
+  });
   const [gradeQueue, setGradeQueue] = useState({
     term: null,
     pending_count: 0,
@@ -231,11 +249,15 @@ const TeacherDashboard = () => {
         classesResponse,
         gradeQueueResponse,
         gradeAnalyticsResponse,
+        coverRequestsResponse,
+        timelineResponse,
       ] = await Promise.all([
         apiService.getTeacherProfile(),
         apiService.getTeacherClasses(),
         apiService.getTeacherGradeQueue(),
         apiService.getTeacherGradeAnalytics(),
+        apiService.getTeacherCoverRequests(),
+        apiService.getTeacherActivityTimeline({ limit: 20 }),
       ]);
       let gradingPolicyResponse = {};
       try {
@@ -282,6 +304,8 @@ const TeacherDashboard = () => {
         chronology: gradeAnalyticsResponse?.chronology || [],
         class_leaders: gradeAnalyticsResponse?.class_leaders || [],
       });
+      setCoverRequests(coverRequestsResponse?.requests || []);
+      setActivityTimeline(timelineResponse?.timeline || []);
       setGradingPolicyData({
         school: gradingPolicyResponse?.school || null,
         selected_class: gradingPolicyResponse?.selected_class || null,
@@ -315,6 +339,13 @@ const TeacherDashboard = () => {
           icon: <BarChart color="info" />,
         },
       ]);
+
+      setCoverForm((prev) => ({
+        ...prev,
+        class_id:
+          prev.class_id ||
+          String((classList || []).find((row) => row?.id)?.id || ""),
+      }));
     } catch (err) {
       setError("Failed to load dashboard data. Please try again.");
       console.error("Error loading teacher dashboard:", err);
@@ -333,6 +364,52 @@ const TeacherDashboard = () => {
       params.set("studentId", studentId);
     }
     navigate(`/teacher/classes?${params.toString()}`);
+  };
+
+  const handleCoverFormChange = (field, value) => {
+    setCoverForm((prev) => ({ ...prev, [field]: value }));
+  };
+
+  const handleSubmitCoverRequest = async () => {
+    if (!coverForm.class_id || !coverForm.cover_date || !coverForm.reason.trim()) {
+      setError("Cover request needs class, date, and reason.");
+      return;
+    }
+
+    try {
+      setCoverSubmitting(true);
+      await apiService.createTeacherCoverRequest({
+        class_id: coverForm.class_id,
+        cover_date: coverForm.cover_date,
+        start_time: coverForm.start_time,
+        end_time: coverForm.end_time,
+        reason: coverForm.reason.trim(),
+        handover_notes: coverForm.handover_notes.trim() || null,
+      });
+      setCoverForm((prev) => ({ ...prev, reason: "", handover_notes: "" }));
+      await loadTeacherData();
+    } catch (requestError) {
+      setError(
+        requestError?.response?.data?.error ||
+          requestError?.message ||
+          "Failed to submit cover request.",
+      );
+    } finally {
+      setCoverSubmitting(false);
+    }
+  };
+
+  const handleCancelCoverRequest = async (requestId) => {
+    try {
+      await apiService.updateTeacherCoverRequest(requestId, { status: "cancelled" });
+      await loadTeacherData();
+    } catch (requestError) {
+      setError(
+        requestError?.response?.data?.error ||
+          requestError?.message ||
+          "Failed to cancel cover request.",
+      );
+    }
   };
 
   const firstDueStudent = gradeQueue.due_students?.[0] || null;
@@ -551,6 +628,194 @@ const TeacherDashboard = () => {
           ))}
         </Grid>
       </Paper>
+
+      <Grid container spacing={3} sx={{ mb: 3 }}>
+        <Grid item xs={12} md={6}>
+          <Paper
+            sx={{
+              p: 2,
+              borderRadius: 3,
+              border: "1px solid",
+              borderColor: "divider",
+              height: "100%",
+            }}
+          >
+            <Typography variant="h6" sx={{ mb: 1.2 }}>
+              Cover / Substitution Requests
+            </Typography>
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
+              Request class cover and add handover notes for substitutes.
+            </Typography>
+
+            <Grid container spacing={1.2}>
+              <Grid item xs={12} sm={6}>
+                <FormControl fullWidth size="small">
+                  <InputLabel>Class</InputLabel>
+                  <Select
+                    value={coverForm.class_id}
+                    label="Class"
+                    onChange={(event) => handleCoverFormChange("class_id", event.target.value)}
+                  >
+                    {classes.map((cls) => (
+                      <MenuItem key={cls.id} value={cls.id}>
+                        {cls.name}
+                      </MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
+              </Grid>
+              <Grid item xs={12} sm={6}>
+                <TextField
+                  size="small"
+                  fullWidth
+                  type="date"
+                  label="Date"
+                  value={coverForm.cover_date}
+                  onChange={(event) => handleCoverFormChange("cover_date", event.target.value)}
+                  InputLabelProps={{ shrink: true }}
+                />
+              </Grid>
+              <Grid item xs={6}>
+                <TextField
+                  size="small"
+                  fullWidth
+                  type="time"
+                  label="Start"
+                  value={coverForm.start_time}
+                  onChange={(event) => handleCoverFormChange("start_time", event.target.value)}
+                  InputLabelProps={{ shrink: true }}
+                />
+              </Grid>
+              <Grid item xs={6}>
+                <TextField
+                  size="small"
+                  fullWidth
+                  type="time"
+                  label="End"
+                  value={coverForm.end_time}
+                  onChange={(event) => handleCoverFormChange("end_time", event.target.value)}
+                  InputLabelProps={{ shrink: true }}
+                />
+              </Grid>
+              <Grid item xs={12}>
+                <TextField
+                  size="small"
+                  fullWidth
+                  label="Reason"
+                  value={coverForm.reason}
+                  onChange={(event) => handleCoverFormChange("reason", event.target.value)}
+                />
+              </Grid>
+              <Grid item xs={12}>
+                <TextField
+                  size="small"
+                  fullWidth
+                  multiline
+                  minRows={2}
+                  label="Handover Notes"
+                  value={coverForm.handover_notes}
+                  onChange={(event) => handleCoverFormChange("handover_notes", event.target.value)}
+                />
+              </Grid>
+              <Grid item xs={12}>
+                <Button
+                  variant="contained"
+                  startIcon={<SwapHoriz />}
+                  onClick={handleSubmitCoverRequest}
+                  disabled={coverSubmitting}
+                >
+                  {coverSubmitting ? "Submitting..." : "Submit Cover Request"}
+                </Button>
+              </Grid>
+            </Grid>
+
+            <Divider sx={{ my: 1.8 }} />
+            <Stack spacing={1}>
+              {coverRequests.slice(0, 5).map((request) => (
+                <Paper
+                  key={request.request_id}
+                  sx={{ p: 1.2, border: "1px solid", borderColor: "divider", borderRadius: 2 }}
+                >
+                  <Box sx={{ display: "flex", justifyContent: "space-between", gap: 1 }}>
+                    <Box sx={{ minWidth: 0 }}>
+                      <Typography variant="body2" sx={{ fontWeight: 700 }}>
+                        {request.class_name} | {request.cover_date}
+                      </Typography>
+                      <Typography variant="caption" color="text.secondary">
+                        {request.start_time} - {request.end_time}
+                      </Typography>
+                    </Box>
+                    <Chip
+                      size="small"
+                      color={request.status === "cancelled" ? "default" : "warning"}
+                      label={request.status || "pending"}
+                    />
+                  </Box>
+                  <Typography variant="caption" color="text.secondary">
+                    {request.reason}
+                  </Typography>
+                  {request.status !== "cancelled" && (
+                    <Box sx={{ mt: 0.8 }}>
+                      <Button
+                        size="small"
+                        variant="text"
+                        onClick={() => handleCancelCoverRequest(request.request_id)}
+                      >
+                        Cancel request
+                      </Button>
+                    </Box>
+                  )}
+                </Paper>
+              ))}
+              {coverRequests.length === 0 && (
+                <Typography variant="body2" color="text.secondary">
+                  No cover requests yet.
+                </Typography>
+              )}
+            </Stack>
+          </Paper>
+        </Grid>
+
+        <Grid item xs={12} md={6}>
+          <Paper
+            sx={{
+              p: 2,
+              borderRadius: 3,
+              border: "1px solid",
+              borderColor: "divider",
+              height: "100%",
+            }}
+          >
+            <Typography variant="h6" sx={{ mb: 1.2 }}>
+              Class Audit Timeline
+            </Typography>
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
+              Real-time log of grading, attendance, cover, and template actions.
+            </Typography>
+            <List disablePadding>
+              {activityTimeline.slice(0, 12).map((item, index) => (
+                <React.Fragment key={item.id}>
+                  <ListItem disableGutters sx={{ py: 1 }}>
+                    <ListItemIcon sx={{ minWidth: 34 }}>
+                      <History fontSize="small" color="info" />
+                    </ListItemIcon>
+                    <ListItemText
+                      primary={item.message}
+                      secondary={new Date(item.happened_at).toLocaleString()}
+                    />
+                  </ListItem>
+                  {index < Math.min(activityTimeline.length - 1, 11) && <Divider />}
+                </React.Fragment>
+              ))}
+              {activityTimeline.length === 0 && (
+                <Typography variant="body2" color="text.secondary">
+                  No timeline events yet.
+                </Typography>
+              )}
+            </List>
+          </Paper>
+        </Grid>
+      </Grid>
 
       <Paper
         sx={{

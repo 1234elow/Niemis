@@ -1,11 +1,13 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   Alert,
+  Autocomplete,
   Box,
   Button,
   Card,
   CardContent,
   Chip,
+  Divider,
   FormControl,
   FormControlLabel,
   Grid,
@@ -14,12 +16,14 @@ import {
   Paper,
   Select,
   Stack,
+  Tab,
   Switch,
   Table,
   TableBody,
   TableCell,
   TableHead,
   TableRow,
+  Tabs,
   TextField,
   Typography,
 } from "@mui/material";
@@ -60,14 +64,51 @@ const formatDate = (value) => {
   return parsed.toLocaleString();
 };
 
+const deriveAcademicYear = () => {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = now.getMonth() + 1;
+  const startYear = month >= 9 ? year : year - 1;
+  return `${startYear}-${startYear + 1}`;
+};
+
 const OperationsPage = () => {
   const queryClient = useQueryClient();
   const [notification, setNotification] = useState(null);
+  const [initiationType, setInitiationType] = useState("student");
   const [transferFilters, setTransferFilters] = useState({
     status: "",
     priority: "",
     student_search: "",
     page: 1,
+  });
+  const [teacherTransferFilters, setTeacherTransferFilters] = useState({
+    status: "",
+    priority: "",
+    teacher_search: "",
+    page: 1,
+  });
+  const [studentDirectorySearch, setStudentDirectorySearch] = useState("");
+  const [teacherDirectorySearch, setTeacherDirectorySearch] = useState("");
+  const [studentInputValue, setStudentInputValue] = useState("");
+  const [teacherInputValue, setTeacherInputValue] = useState("");
+  const [selectedStudentOption, setSelectedStudentOption] = useState(null);
+  const [selectedTeacherOption, setSelectedTeacherOption] = useState(null);
+  const [studentTransferDraft, setStudentTransferDraft] = useState({
+    student_id: "",
+    to_school_id: "",
+    transfer_reason: "",
+    academic_year: deriveAcademicYear(),
+    target_grade: "",
+    effective_date: "",
+    admin_notes: "",
+  });
+  const [teacherTransferDraft, setTeacherTransferDraft] = useState({
+    teacher_id: "",
+    to_school_id: "",
+    transfer_reason: "",
+    effective_date: "",
+    admin_notes: "",
   });
   const [playbookPreview, setPlaybookPreview] = useState(null);
   const [rolloverForm, setRolloverForm] = useState({
@@ -125,6 +166,61 @@ const OperationsPage = () => {
   );
 
   const {
+    data: teacherTransferWorkflow,
+    isLoading: teacherTransfersLoading,
+    refetch: refetchTeacherTransfers,
+  } = useQuery(
+    [
+      "operations-teacher-transfer-workflow",
+      teacherTransferFilters.status,
+      teacherTransferFilters.priority,
+      teacherTransferFilters.teacher_search,
+      teacherTransferFilters.page,
+    ],
+    () =>
+      apiService.getTeacherTransferWorkflow({
+        status: teacherTransferFilters.status || undefined,
+        priority: teacherTransferFilters.priority || undefined,
+        teacher_search: teacherTransferFilters.teacher_search || undefined,
+        page: teacherTransferFilters.page,
+        limit: 15,
+      }),
+    {
+      keepPreviousData: true,
+      staleTime: 10 * 1000,
+    },
+  );
+
+  const { data: studentDirectoryData, isLoading: studentDirectoryLoading } = useQuery(
+    ["operations-student-directory", studentDirectorySearch],
+    () =>
+      apiService.getStudentDirectory({
+        search: studentDirectorySearch || undefined,
+        limit: 50,
+      }),
+    {
+      keepPreviousData: true,
+      staleTime: 20 * 1000,
+      enabled: initiationType === "student",
+    },
+  );
+
+  const { data: staffDirectoryData, isLoading: staffDirectoryLoading } = useQuery(
+    ["operations-staff-directory", teacherDirectorySearch],
+    () =>
+      apiService.getStaffDirectory({
+        search: teacherDirectorySearch || undefined,
+        limit: 50,
+        role_level: "teacher",
+      }),
+    {
+      keepPreviousData: true,
+      staleTime: 20 * 1000,
+      enabled: initiationType === "teacher",
+    },
+  );
+
+  const {
     data: playbooksData,
     isLoading: playbooksLoading,
     refetch: refetchPlaybooks,
@@ -144,6 +240,85 @@ const OperationsPage = () => {
           type: "error",
           message:
             error?.response?.data?.error || error?.message || "Failed to update transfer workflow.",
+        });
+      },
+    },
+  );
+
+  const teacherTransferActionMutation = useMutation(
+    ({ transferId, payload }) => apiService.updateTeacherTransferWorkflow(transferId, payload),
+    {
+      onSuccess: () => {
+        setNotification({ type: "success", message: "Teacher transfer workflow updated." });
+        queryClient.invalidateQueries(["operations-teacher-transfer-workflow"]);
+      },
+      onError: (error) => {
+        setNotification({
+          type: "error",
+          message:
+            error?.response?.data?.error ||
+            error?.message ||
+            "Failed to update teacher transfer workflow.",
+        });
+      },
+    },
+  );
+
+  const initiateStudentTransferMutation = useMutation(
+    (payload) => apiService.initiateStudentTransfer(payload),
+    {
+      onSuccess: (result) => {
+        setNotification({
+          type: "success",
+          message: result?.message || "Student transfer initiated successfully.",
+        });
+        setStudentTransferDraft({
+          student_id: "",
+          to_school_id: "",
+          transfer_reason: "",
+          academic_year: deriveAcademicYear(),
+          target_grade: "",
+          effective_date: "",
+          admin_notes: "",
+        });
+        queryClient.invalidateQueries(["operations-transfer-workflow"]);
+      },
+      onError: (error) => {
+        setNotification({
+          type: "error",
+          message:
+            error?.response?.data?.error ||
+            error?.message ||
+            "Failed to initiate student transfer.",
+        });
+      },
+    },
+  );
+
+  const initiateTeacherTransferMutation = useMutation(
+    (payload) => apiService.initiateTeacherTransfer(payload),
+    {
+      onSuccess: (result) => {
+        setNotification({
+          type: "success",
+          message: result?.message || "Teacher transfer initiated successfully.",
+        });
+        setTeacherTransferDraft({
+          teacher_id: "",
+          to_school_id: "",
+          transfer_reason: "",
+          effective_date: "",
+          admin_notes: "",
+        });
+        queryClient.invalidateQueries(["operations-teacher-transfer-workflow"]);
+      },
+      onError: (error) => {
+        setNotification({
+          type: "error",
+          message:
+            error?.response?.data?.error ||
+            error?.message ||
+            "Failed to initiate teacher transfer.",
         });
       },
     },
@@ -221,9 +396,35 @@ const OperationsPage = () => {
   const schools = schoolsData?.schools || [];
   const zoneRows = zonePerformance?.zones || [];
   const schoolPoints = zonePerformance?.school_points || [];
-  const transfers = transferWorkflow?.transfers || [];
-  const transferPagination = transferWorkflow?.pagination || {};
+  const studentTransfers = transferWorkflow?.transfers || [];
+  const studentTransferPagination = transferWorkflow?.pagination || {};
+  const teacherTransfers = teacherTransferWorkflow?.transfers || [];
+  const teacherTransferPagination = teacherTransferWorkflow?.pagination || {};
+  const transfers = studentTransfers;
+  const transferPagination = studentTransferPagination;
+  const studentDirectory = studentDirectoryData?.students || [];
+  const staffDirectory = staffDirectoryData?.staff || [];
   const playbooks = playbooksData?.playbooks || [];
+  const selectedStudent =
+    studentDirectory.find((row) => row.id === studentTransferDraft.student_id) ||
+    (selectedStudentOption?.id === studentTransferDraft.student_id ? selectedStudentOption : null);
+  const selectedTeacher =
+    staffDirectory.find((row) => row.id === teacherTransferDraft.teacher_id) ||
+    (selectedTeacherOption?.id === teacherTransferDraft.teacher_id ? selectedTeacherOption : null);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setStudentDirectorySearch(studentInputValue.trim());
+    }, 180);
+    return () => clearTimeout(timer);
+  }, [studentInputValue]);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setTeacherDirectorySearch(teacherInputValue.trim());
+    }, 180);
+    return () => clearTimeout(timer);
+  }, [teacherInputValue]);
 
   const highRiskSchools = useMemo(
     () => [...schoolPoints].sort((a, b) => Number(a.performance_score || 0) - Number(b.performance_score || 0)).slice(0, 10),
@@ -231,7 +432,12 @@ const OperationsPage = () => {
   );
 
   const refreshAll = async () => {
-    await Promise.all([refetchZones(), refetchTransfers(), refetchPlaybooks()]);
+    await Promise.all([
+      refetchZones(),
+      refetchTransfers(),
+      refetchTeacherTransfers(),
+      refetchPlaybooks(),
+    ]);
   };
 
   const triggerRolloverPreview = () => {
@@ -251,7 +457,59 @@ const OperationsPage = () => {
     });
   };
 
-  if (zonesLoading || transfersLoading || playbooksLoading || schoolsLoading) {
+  const submitStudentTransfer = () => {
+    if (!studentTransferDraft.student_id || !studentTransferDraft.to_school_id) {
+      setNotification({
+        type: "error",
+        message: "Select a student and target school before submitting.",
+      });
+      return;
+    }
+    if (!studentTransferDraft.transfer_reason.trim()) {
+      setNotification({
+        type: "error",
+        message: "Transfer reason is required.",
+      });
+      return;
+    }
+
+    initiateStudentTransferMutation.mutate({
+      ...studentTransferDraft,
+      transfer_reason: studentTransferDraft.transfer_reason.trim(),
+      target_grade:
+        studentTransferDraft.target_grade ||
+        selectedStudent?.current_grade ||
+        selectedStudent?.grade_level,
+      effective_date: studentTransferDraft.effective_date || undefined,
+      admin_notes: studentTransferDraft.admin_notes || undefined,
+    });
+  };
+
+  const submitTeacherTransfer = () => {
+    if (!teacherTransferDraft.teacher_id || !teacherTransferDraft.to_school_id) {
+      setNotification({
+        type: "error",
+        message: "Select a teacher and target school before submitting.",
+      });
+      return;
+    }
+    if (!teacherTransferDraft.transfer_reason.trim()) {
+      setNotification({
+        type: "error",
+        message: "Transfer reason is required.",
+      });
+      return;
+    }
+
+    initiateTeacherTransferMutation.mutate({
+      ...teacherTransferDraft,
+      transfer_reason: teacherTransferDraft.transfer_reason.trim(),
+      effective_date: teacherTransferDraft.effective_date || undefined,
+      admin_notes: teacherTransferDraft.admin_notes || undefined,
+    });
+  };
+
+  if (zonesLoading || transfersLoading || teacherTransfersLoading || playbooksLoading || schoolsLoading) {
     return <LoadingSpinner />;
   }
 
@@ -316,6 +574,258 @@ const OperationsPage = () => {
 
       <Grid container spacing={3}>
         <Grid item xs={12} lg={7}>
+          <Paper sx={{ p: 2.5, mb: 3 }}>
+            <Typography variant="h6" sx={{ mb: 0.5 }}>
+              Transfer Intake Desk
+            </Typography>
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
+              Start student and teacher transfers from one place with guided fields.
+            </Typography>
+            <Tabs
+              value={initiationType}
+              onChange={(_, nextValue) => setInitiationType(nextValue)}
+              sx={{ mb: 1.5 }}
+            >
+              <Tab value="student" label="Student Transfer" />
+              <Tab value="teacher" label="Teacher Transfer" />
+            </Tabs>
+            <Divider sx={{ mb: 1.5 }} />
+
+            {initiationType === "student" ? (
+              <Stack spacing={1.25}>
+                <Autocomplete
+                  options={studentDirectory}
+                  loading={studentDirectoryLoading}
+                  value={selectedStudent}
+                  inputValue={studentInputValue}
+                  isOptionEqualToValue={(option, value) => option?.id === value?.id}
+                  onInputChange={(_, value, reason) => {
+                    if (reason === "clear") {
+                      setStudentInputValue("");
+                      return;
+                    }
+                    if (reason === "input" || reason === "reset") {
+                      setStudentInputValue(value || "");
+                    }
+                  }}
+                  onChange={(_, value) => {
+                    setSelectedStudentOption(value || null);
+                    setStudentTransferDraft((previous) => ({
+                      ...previous,
+                      student_id: value?.id || "",
+                      to_school_id:
+                        value?.school_id && previous.to_school_id === value.school_id
+                          ? ""
+                          : previous.to_school_id,
+                      target_grade:
+                        value?.current_grade || value?.grade_level || previous.target_grade,
+                    }));
+                  }}
+                  getOptionLabel={(option) =>
+                    `${option?.first_name || ""} ${option?.last_name || ""} (${option?.student_id || "No ID"})`
+                  }
+                  renderInput={(params) => <TextField {...params} label="Select Student" />}
+                />
+                <FormControl fullWidth>
+                  <InputLabel>Target School</InputLabel>
+                  <Select
+                    value={studentTransferDraft.to_school_id}
+                    label="Target School"
+                    onChange={(event) =>
+                      setStudentTransferDraft((previous) => ({
+                        ...previous,
+                        to_school_id: event.target.value,
+                      }))
+                    }
+                  >
+                    {schools
+                      .filter((school) => school.id !== selectedStudent?.school_id)
+                      .map((school) => (
+                        <MenuItem key={school.id} value={school.id}>
+                          {school.name}
+                        </MenuItem>
+                      ))}
+                  </Select>
+                </FormControl>
+                <Grid container spacing={1.25}>
+                  <Grid item xs={12} md={6}>
+                    <TextField
+                      fullWidth
+                      label="Academic Year"
+                      value={studentTransferDraft.academic_year}
+                      onChange={(event) =>
+                        setStudentTransferDraft((previous) => ({
+                          ...previous,
+                          academic_year: event.target.value,
+                        }))
+                      }
+                    />
+                  </Grid>
+                  <Grid item xs={12} md={6}>
+                    <TextField
+                      fullWidth
+                      label="Target Grade"
+                      value={studentTransferDraft.target_grade}
+                      onChange={(event) =>
+                        setStudentTransferDraft((previous) => ({
+                          ...previous,
+                          target_grade: event.target.value,
+                        }))
+                      }
+                    />
+                  </Grid>
+                </Grid>
+                <TextField
+                  fullWidth
+                  label="Effective Date"
+                  type="date"
+                  InputLabelProps={{ shrink: true }}
+                  value={studentTransferDraft.effective_date}
+                  onChange={(event) =>
+                    setStudentTransferDraft((previous) => ({
+                      ...previous,
+                      effective_date: event.target.value,
+                    }))
+                  }
+                />
+                <TextField
+                  fullWidth
+                  label="Transfer Reason"
+                  multiline
+                  minRows={2}
+                  value={studentTransferDraft.transfer_reason}
+                  onChange={(event) =>
+                    setStudentTransferDraft((previous) => ({
+                      ...previous,
+                      transfer_reason: event.target.value,
+                    }))
+                  }
+                />
+                <TextField
+                  fullWidth
+                  label="Admin Notes (Optional)"
+                  multiline
+                  minRows={2}
+                  value={studentTransferDraft.admin_notes}
+                  onChange={(event) =>
+                    setStudentTransferDraft((previous) => ({
+                      ...previous,
+                      admin_notes: event.target.value,
+                    }))
+                  }
+                />
+                <Button
+                  variant="contained"
+                  onClick={submitStudentTransfer}
+                  disabled={initiateStudentTransferMutation.isLoading}
+                >
+                  Submit Student Transfer
+                </Button>
+              </Stack>
+            ) : (
+              <Stack spacing={1.25}>
+                <Autocomplete
+                  options={staffDirectory}
+                  loading={staffDirectoryLoading}
+                  value={selectedTeacher}
+                  inputValue={teacherInputValue}
+                  isOptionEqualToValue={(option, value) => option?.id === value?.id}
+                  onInputChange={(_, value, reason) => {
+                    if (reason === "clear") {
+                      setTeacherInputValue("");
+                      return;
+                    }
+                    if (reason === "input" || reason === "reset") {
+                      setTeacherInputValue(value || "");
+                    }
+                  }}
+                  onChange={(_, value) => {
+                    setSelectedTeacherOption(value || null);
+                    setTeacherTransferDraft((previous) => ({
+                      ...previous,
+                      teacher_id: value?.id || "",
+                      to_school_id:
+                        value?.school_id && previous.to_school_id === value.school_id
+                          ? ""
+                          : previous.to_school_id,
+                    }));
+                  }}
+                  getOptionLabel={(option) =>
+                    `${option?.first_name || ""} ${option?.last_name || ""} (${option?.employee_id || "No ID"})`
+                  }
+                  renderInput={(params) => <TextField {...params} label="Select Teacher" />}
+                />
+                <FormControl fullWidth>
+                  <InputLabel>Target School</InputLabel>
+                  <Select
+                    value={teacherTransferDraft.to_school_id}
+                    label="Target School"
+                    onChange={(event) =>
+                      setTeacherTransferDraft((previous) => ({
+                        ...previous,
+                        to_school_id: event.target.value,
+                      }))
+                    }
+                  >
+                    {schools
+                      .filter((school) => school.id !== selectedTeacher?.school_id)
+                      .map((school) => (
+                        <MenuItem key={school.id} value={school.id}>
+                          {school.name}
+                        </MenuItem>
+                      ))}
+                  </Select>
+                </FormControl>
+                <TextField
+                  fullWidth
+                  label="Effective Date"
+                  type="date"
+                  InputLabelProps={{ shrink: true }}
+                  value={teacherTransferDraft.effective_date}
+                  onChange={(event) =>
+                    setTeacherTransferDraft((previous) => ({
+                      ...previous,
+                      effective_date: event.target.value,
+                    }))
+                  }
+                />
+                <TextField
+                  fullWidth
+                  label="Transfer Reason"
+                  multiline
+                  minRows={2}
+                  value={teacherTransferDraft.transfer_reason}
+                  onChange={(event) =>
+                    setTeacherTransferDraft((previous) => ({
+                      ...previous,
+                      transfer_reason: event.target.value,
+                    }))
+                  }
+                />
+                <TextField
+                  fullWidth
+                  label="Admin Notes (Optional)"
+                  multiline
+                  minRows={2}
+                  value={teacherTransferDraft.admin_notes}
+                  onChange={(event) =>
+                    setTeacherTransferDraft((previous) => ({
+                      ...previous,
+                      admin_notes: event.target.value,
+                    }))
+                  }
+                />
+                <Button
+                  variant="contained"
+                  onClick={submitTeacherTransfer}
+                  disabled={initiateTeacherTransferMutation.isLoading}
+                >
+                  Submit Teacher Transfer
+                </Button>
+              </Stack>
+            )}
+          </Paper>
+
           <Paper sx={{ p: 2.5, mb: 3 }}>
             <Typography variant="h6" sx={{ mb: 1.5 }}>
               Transfer Workflow 2.0
@@ -499,6 +1009,213 @@ const OperationsPage = () => {
             </Table>
             <Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 1 }}>
               {formatCount(transferPagination.total_count)} total transfer workflow records.
+            </Typography>
+          </Paper>
+
+          <Paper sx={{ p: 2.5, mb: 3 }}>
+            <Typography variant="h6" sx={{ mb: 1.5 }}>
+              Teacher Transfer Workflow
+            </Typography>
+            <Grid container spacing={1.5} sx={{ mb: 1.5 }}>
+              <Grid item xs={12} md={4}>
+                <FormControl fullWidth>
+                  <InputLabel>Status</InputLabel>
+                  <Select
+                    label="Status"
+                    value={teacherTransferFilters.status}
+                    onChange={(event) =>
+                      setTeacherTransferFilters((previous) => ({
+                        ...previous,
+                        status: event.target.value,
+                        page: 1,
+                      }))
+                    }
+                  >
+                    {transferStatusOptions.map((option) => (
+                      <MenuItem key={`teacher-status-${option.value || "all"}`} value={option.value}>
+                        {option.label}
+                      </MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
+              </Grid>
+              <Grid item xs={12} md={4}>
+                <FormControl fullWidth>
+                  <InputLabel>Priority</InputLabel>
+                  <Select
+                    label="Priority"
+                    value={teacherTransferFilters.priority}
+                    onChange={(event) =>
+                      setTeacherTransferFilters((previous) => ({
+                        ...previous,
+                        priority: event.target.value,
+                        page: 1,
+                      }))
+                    }
+                  >
+                    {transferPriorityOptions.map((option) => (
+                      <MenuItem key={`teacher-priority-${option.value || "all"}`} value={option.value}>
+                        {option.label}
+                      </MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
+              </Grid>
+              <Grid item xs={12} md={4}>
+                <TextField
+                  fullWidth
+                  label="Teacher Search"
+                  value={teacherTransferFilters.teacher_search}
+                  onChange={(event) =>
+                    setTeacherTransferFilters((previous) => ({
+                      ...previous,
+                      teacher_search: event.target.value,
+                      page: 1,
+                    }))
+                  }
+                />
+              </Grid>
+            </Grid>
+            <Table size="small">
+              <TableHead>
+                <TableRow>
+                  <TableCell>Teacher</TableCell>
+                  <TableCell>Route</TableCell>
+                  <TableCell>Status</TableCell>
+                  <TableCell>Priority</TableCell>
+                  <TableCell>SLA</TableCell>
+                  <TableCell align="right">Actions</TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {teacherTransfers.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={6}>
+                      <Typography variant="body2" color="text.secondary">
+                        No teacher transfers found for current filters.
+                      </Typography>
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  teacherTransfers.map((transfer) => (
+                    <TableRow key={transfer.id}>
+                      <TableCell>
+                        <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                          {transfer.teacher_name || "Unknown teacher"}
+                        </Typography>
+                        <Typography variant="caption" color="text.secondary" sx={{ display: "block" }}>
+                          {transfer.teacher_code || "No employee ID"}
+                        </Typography>
+                        <Typography variant="caption" color="text.secondary">
+                          {transfer.teacher_position || "No role recorded"}
+                        </Typography>
+                      </TableCell>
+                      <TableCell>
+                        <Typography variant="body2">{transfer.from_school_name || "Unknown"}</Typography>
+                        <Typography variant="caption" color="text.secondary">
+                          to {transfer.to_school_name || "Unknown"}
+                        </Typography>
+                      </TableCell>
+                      <TableCell>
+                        <Chip size="small" label={transfer.status} />
+                        <Typography variant="caption" color="text.secondary" sx={{ display: "block" }}>
+                          {transfer.stage}
+                        </Typography>
+                      </TableCell>
+                      <TableCell>
+                        <Chip
+                          size="small"
+                          color={
+                            transfer.priority === "critical"
+                              ? "error"
+                              : transfer.priority === "high"
+                                ? "warning"
+                                : "default"
+                          }
+                          label={transfer.priority}
+                        />
+                      </TableCell>
+                      <TableCell>
+                        <Typography variant="caption">
+                          {transfer.sla_due_at ? formatDate(transfer.sla_due_at) : "N/A"}
+                        </Typography>
+                        {transfer.is_overdue ? (
+                          <Chip size="small" color="error" label="Overdue" sx={{ ml: 1 }} />
+                        ) : null}
+                      </TableCell>
+                      <TableCell align="right">
+                        <Stack direction="row" spacing={1} justifyContent="flex-end">
+                          {transfer.status === "pending" ? (
+                            <Button
+                              size="small"
+                              onClick={() =>
+                                teacherTransferActionMutation.mutate({
+                                  transferId: transfer.id,
+                                  payload: { action: "approve" },
+                                })
+                              }
+                            >
+                              Approve
+                            </Button>
+                          ) : null}
+                          {transfer.status === "approved" ? (
+                            <Button
+                              size="small"
+                              onClick={() =>
+                                teacherTransferActionMutation.mutate({
+                                  transferId: transfer.id,
+                                  payload: {
+                                    action: "mark_handover",
+                                    class_handover_completed: true,
+                                    documents_verified: true,
+                                  },
+                                })
+                              }
+                            >
+                              Mark Handover
+                            </Button>
+                          ) : null}
+                          {transfer.status === "approved" ? (
+                            <Button
+                              size="small"
+                              variant="contained"
+                              onClick={() =>
+                                teacherTransferActionMutation.mutate({
+                                  transferId: transfer.id,
+                                  payload: {
+                                    action: "complete",
+                                    class_handover_completed: true,
+                                    documents_verified: true,
+                                  },
+                                })
+                              }
+                            >
+                              Complete
+                            </Button>
+                          ) : null}
+                          {["pending", "approved"].includes(transfer.status) ? (
+                            <Button
+                              size="small"
+                              color="error"
+                              onClick={() =>
+                                teacherTransferActionMutation.mutate({
+                                  transferId: transfer.id,
+                                  payload: { action: "reject" },
+                                })
+                              }
+                            >
+                              Reject
+                            </Button>
+                          ) : null}
+                        </Stack>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+            <Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 1 }}>
+              {formatCount(teacherTransferPagination.total_count)} total teacher transfer records.
             </Typography>
           </Paper>
 

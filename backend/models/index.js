@@ -17,6 +17,7 @@ const StudentAthletics = require('./StudentAthletics')(sequelize, DataTypes);
 const AttendanceRecord = require('./AttendanceRecord')(sequelize, DataTypes);
 const AcademicRecord = require('./AcademicRecord')(sequelize, DataTypes);
 const StudentTransfer = require('./StudentTransfer')(sequelize, DataTypes);
+const TeacherTransfer = require('./TeacherTransfer')(sequelize, DataTypes);
 const Facility = require('./Facility')(sequelize, DataTypes);
 const InventoryItem = require('./InventoryItem')(sequelize, DataTypes);
 const TeacherEvaluation = require('./TeacherEvaluation')(sequelize, DataTypes);
@@ -52,6 +53,7 @@ const models = {
     AttendanceRecord,
     AcademicRecord,
     StudentTransfer,
+    TeacherTransfer,
     Facility,
     InventoryItem,
     TeacherEvaluation,
@@ -85,6 +87,8 @@ School.hasMany(Facility, { foreignKey: 'school_id' });
 School.hasMany(RFIDDevice, { foreignKey: 'school_id' });
 School.hasOne(SchoolDayPolicy, { foreignKey: 'school_id' });
 School.hasMany(GradingPolicy, { foreignKey: 'school_id' });
+School.hasMany(TeacherTransfer, { foreignKey: 'from_school_id', as: 'OutgoingTeacherTransfers' });
+School.hasMany(TeacherTransfer, { foreignKey: 'to_school_id', as: 'IncomingTeacherTransfers' });
 
 // Staff associations
 Staff.belongsTo(User, { foreignKey: 'user_id' });
@@ -93,6 +97,7 @@ Staff.hasMany(TeacherEvaluation, { foreignKey: 'teacher_id' });
 Staff.hasMany(ProfessionalDevelopment, { foreignKey: 'staff_id' });
 Staff.hasMany(AcademicRecord, { foreignKey: 'teacher_id' });
 Staff.hasMany(ClassTimetableSlot, { foreignKey: 'teacher_id' });
+Staff.hasMany(TeacherTransfer, { foreignKey: 'teacher_id' });
 
 // Student associations
 Student.belongsTo(User, { foreignKey: 'user_id' });
@@ -130,8 +135,14 @@ AcademicRecord.belongsTo(Student, { foreignKey: 'student_id' });
 AcademicRecord.belongsTo(Staff, { foreignKey: 'teacher_id', as: 'teacher' });
 
 StudentTransfer.belongsTo(Student, { foreignKey: 'student_id' });
-StudentTransfer.belongsTo(School, { foreignKey: 'from_school_id', as: 'fromSchool' });
-StudentTransfer.belongsTo(School, { foreignKey: 'to_school_id', as: 'toSchool' });
+StudentTransfer.belongsTo(School, { foreignKey: 'from_school_id', as: 'FromSchool' });
+StudentTransfer.belongsTo(School, { foreignKey: 'to_school_id', as: 'ToSchool' });
+StudentTransfer.belongsTo(User, { foreignKey: 'initiated_by', as: 'InitiatedBy' });
+StudentTransfer.belongsTo(User, { foreignKey: 'approved_by', as: 'ApprovedBy' });
+
+TeacherTransfer.belongsTo(Staff, { foreignKey: 'teacher_id', as: 'Teacher' });
+TeacherTransfer.belongsTo(School, { foreignKey: 'from_school_id', as: 'FromSchool' });
+TeacherTransfer.belongsTo(School, { foreignKey: 'to_school_id', as: 'ToSchool' });
 
 TeacherEvaluation.belongsTo(Staff, { foreignKey: 'teacher_id', as: 'teacher' });
 TeacherEvaluation.belongsTo(Staff, { foreignKey: 'evaluator_id', as: 'evaluator' });

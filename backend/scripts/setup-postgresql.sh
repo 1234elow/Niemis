@@ -17,7 +17,12 @@ NC='\033[0m' # No Color
 # Configuration
 DB_NAME="niemis_local"
 DB_USER="niemis_admin"
-DB_PASSWORD="NiEMIS_Admin_2024!"
+if command -v openssl >/dev/null 2>&1; then
+    GENERATED_DB_PASSWORD="$(openssl rand -base64 24 | tr -dc 'A-Za-z0-9' | head -c 24)"
+else
+    GENERATED_DB_PASSWORD="$(date +%s%N | sha256sum | head -c 24)"
+fi
+DB_PASSWORD="${DB_PASSWORD:-$GENERATED_DB_PASSWORD}"
 POSTGRES_USER="postgres"
 POSTGRES_HOST="localhost"
 POSTGRES_PORT="5432"

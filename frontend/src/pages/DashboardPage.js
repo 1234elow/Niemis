@@ -6,6 +6,7 @@ import { useQuery } from "react-query";
 import { apiService } from "../services/apiService";
 import { useAuth } from "../contexts/AuthContext";
 import LoadingSpinner from "../components/LoadingSpinner";
+import { formatBarbadosDateTime } from "../utils/dateTime";
 
 // Dashboard Components
 import {
@@ -44,10 +45,7 @@ const TabPanel = ({ children, value, index, ...other }) => (
 );
 
 const formatAuditDate = (value) => {
-  if (!value) return "Unknown time";
-  const parsed = new Date(value);
-  if (Number.isNaN(parsed.getTime())) return "Unknown time";
-  return parsed.toLocaleString();
+  return formatBarbadosDateTime(value);
 };
 
 /**
@@ -84,7 +82,7 @@ const DashboardPage = () => {
     () =>
       apiService.getAdminAuditLogs({
         page: 1,
-        limit: 50,
+        limit: 250,
         date_from: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
       }),
     {
@@ -539,7 +537,11 @@ const DashboardPage = () => {
 
       {/* Audit Tab */}
       <TabPanel value={activeTab} index={5}>
-        <RecentAuditPanel recentAudits={recentAudits} />
+        <RecentAuditPanel
+          recentAudits={recentAudits}
+          isFetching={isFetchingAuditStream}
+          filterMeta={auditStreamData?.filters || {}}
+        />
       </TabPanel>
       </Box>
     </Box>

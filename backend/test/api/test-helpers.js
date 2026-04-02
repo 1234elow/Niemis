@@ -1,7 +1,15 @@
-const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
-const { User, School, Student, Staff, Parent } = require('../../models');
+const {
+    User,
+    School,
+    Student,
+    Staff,
+    Parent,
+    AuditLog,
+    StudentParentRelationship
+} = require('../../models');
 const { sequelize } = require('../../config/database');
+const { jwtManager } = require('../../config/jwt');
 
 /**
  * Test Helper Functions for API Testing
@@ -20,7 +28,8 @@ class TestHelpers {
             schools: [],
             students: [],
             staff: [],
-            parents: []
+            parents: [],
+            relationships: []
         };
     }
 
@@ -40,6 +49,7 @@ class TestHelpers {
         const userRoles = [
             {
                 role: 'super_admin',
+                username: 'super_admin_test',
                 email: 'super.admin@test.niemis.com',
                 first_name: 'Super',
                 last_name: 'Admin',
@@ -47,6 +57,7 @@ class TestHelpers {
             },
             {
                 role: 'admin',
+                username: 'school_admin_test',
                 email: 'admin@test.niemis.com',
                 first_name: 'School',
                 last_name: 'Admin',
@@ -54,6 +65,7 @@ class TestHelpers {
             },
             {
                 role: 'teacher',
+                username: 'teacher_test',
                 email: 'teacher@test.niemis.com',
                 first_name: 'Test',
                 last_name: 'Teacher',
@@ -61,6 +73,7 @@ class TestHelpers {
             },
             {
                 role: 'parent',
+                username: 'parent_test',
                 email: 'parent@test.niemis.com',
                 first_name: 'Test',
                 last_name: 'Parent',
@@ -68,6 +81,7 @@ class TestHelpers {
             },
             {
                 role: 'student',
+                username: 'student_test',
                 email: 'student@test.niemis.com',
                 first_name: 'Test',
                 last_name: 'Student',
@@ -90,8 +104,87 @@ class TestHelpers {
             
             this.testUsers[userData.role] = {
                 ...user.toJSON(),
+                first_name: userData.first_name,
+                last_name: userData.last_name,
                 password: testPassword
             };
+        }
+
+        const uniqueSuffix = `${Date.now()}${Math.floor(Math.random() * 1000)}`;
+
+        // Ensure staff profiles exist for admin + teacher so school scope resolves in access-control middleware
+        for (const role of ['admin', 'teacher']) {
+            const roleUser = this.testUsers[role];
+            let staffProfile = await Staff.findOne({ where: { user_id: roleUser.id } });
+            if (!staffProfile) {
+                staffProfile = await Staff.create({
+                    user_id: roleUser.id,
+                    school_id: roleUser.school_id || testSchool.id,
+                    employee_id: `${role.toUpperCase()}-${uniqueSuffix}`.slice(0, 20),
+                    first_name: roleUser.first_name,
+                    last_name: roleUser.last_name,
+                    position: role === 'admin' ? 'Administrator' : 'Teacher',
+                    role_level: role === 'admin' ? 'administrator' : 'teacher',
+                    department: role === 'admin' ? 'Administration' : 'Mathematics',
+                    hire_date: '2020-01-01',
+                    is_active: true
+                });
+                this.createdIds.staff.push(staffProfile.id);
+            }
+            this.testStaff[role] = staffProfile;
+        }
+
+        // Ensure a student profile exists for student role
+        const studentUser = this.testUsers.student;
+        let studentProfile = await Student.findOne({ where: { user_id: studentUser.id } });
+        if (!studentProfile) {
+            studentProfile = await Student.create({
+                student_id: `TST-${uniqueSuffix}`.slice(0, 20),
+                user_id: studentUser.id,
+                school_id: studentUser.school_id || testSchool.id,
+                first_name: studentUser.first_name,
+                last_name: studentUser.last_name,
+                date_of_birth: '2011-01-01',
+                gender: 'male',
+                grade_level: 'Class 4',
+                enrollment_date: new Date(),
+                is_active: true
+            });
+            this.createdIds.students.push(studentProfile.id);
+        }
+        this.testStudents.student = studentProfile;
+
+        // Ensure a parent profile exists and is linked to the student profile
+        const parentUser = this.testUsers.parent;
+        let parentProfile = await Parent.findOne({ where: { user_id: parentUser.id } });
+        if (!parentProfile) {
+            parentProfile = await Parent.create({
+                user_id: parentUser.id,
+                first_name: parentUser.first_name,
+                last_name: parentUser.last_name,
+                relationship: 'parent',
+                phone: '246-555-0199',
+                email: parentUser.email,
+                is_emergency_contact: true
+            });
+            this.createdIds.parents.push(parentProfile.id);
+        }
+        this.testParents.parent = parentProfile;
+
+        const existingLink = await StudentParentRelationship.findOne({
+            where: {
+                student_id: studentProfile.id,
+                parent_id: parentProfile.id
+            }
+        });
+        if (!existingLink) {
+            const relationship = await StudentParentRelationship.create({
+                student_id: studentProfile.id,
+                parent_id: parentProfile.id,
+                relationship_type: 'parent',
+                is_primary: true
+            });
+            this.createdIds.relationships.push(relationship.id);
         }
         
         return this.testUsers;
@@ -101,16 +194,17 @@ class TestHelpers {
      * Create test school data
      */
     async createTestSchool() {
+        const uniqueCode = `TEST${Date.now()}`.slice(0, 20);
         const testSchool = await School.create({
             name: 'Test Elementary School',
-            school_code: 'TEST001',
-            school_type: 'Primary',
+            school_code: uniqueCode,
+            school_type: 'primary',
             address: '123 Test Street, Test City',
             phone: '246-555-0123',
             email: 'test@testschool.edu.bb',
             principal_name: 'Test Principal',
-            zone_id: 1,
-            parish_id: 1,
+            zone_id: null,
+            parish_id: null,
             is_active: true
         });
         
@@ -138,7 +232,8 @@ class TestHelpers {
             first_name: user.first_name,
             last_name: user.last_name,
             date_of_birth: new Date('2010-01-01'),
-            gender: 'M',
+            // Student model uses enum: male/female/other
+            gender: 'male',
             grade_level: '5',
             enrollment_date: new Date(),
             is_active: true
@@ -195,9 +290,7 @@ class TestHelpers {
             email: user.email
         };
         
-        return jwt.sign(payload, process.env.JWT_SECRET || 'test-secret', {
-            expiresIn: '1h'
-        });
+        return jwtManager.generateAccessToken(payload, { expiresIn: '1h' }).token;
     }
 
     /**
@@ -212,30 +305,34 @@ class TestHelpers {
      * Create test data for different scenarios
      */
     async createTestScenarios() {
+        const uniqueSuffix = `${Date.now()}${Math.floor(Math.random() * 1000)}`;
+        const primaryCode = `TPSA${uniqueSuffix}`.slice(0, 12);
+        const secondaryCode = `TSSB${uniqueSuffix}`.slice(0, 12);
+
         // Create multiple schools for testing
         const schools = await Promise.all([
             School.create({
                 name: 'Test Primary School A',
-                school_code: 'TPSA001',
-                school_type: 'Primary',
+                school_code: primaryCode,
+                school_type: 'primary',
                 address: '100 Primary Street',
                 phone: '246-555-0100',
                 email: 'primary@test.edu.bb',
                 principal_name: 'Principal A',
-                zone_id: 1,
-                parish_id: 1,
+                zone_id: null,
+                parish_id: null,
                 is_active: true
             }),
             School.create({
                 name: 'Test Secondary School B',
-                school_code: 'TSSB001',
-                school_type: 'Secondary',
+                school_code: secondaryCode,
+                school_type: 'secondary',
                 address: '200 Secondary Street',
                 phone: '246-555-0200',
                 email: 'secondary@test.edu.bb',
                 principal_name: 'Principal B',
-                zone_id: 2,
-                parish_id: 2,
+                zone_id: null,
+                parish_id: null,
                 is_active: true
             })
         ]);
@@ -251,7 +348,7 @@ class TestHelpers {
                 first_name: 'Student',
                 last_name: 'One',
                 date_of_birth: new Date('2010-01-01'),
-                gender: 'M',
+                gender: 'male',
                 grade_level: '5',
                 enrollment_date: new Date(),
                 is_active: true
@@ -263,7 +360,7 @@ class TestHelpers {
                 first_name: 'Student',
                 last_name: 'Two',
                 date_of_birth: new Date('2008-01-01'),
-                gender: 'F',
+                gender: 'female',
                 grade_level: '8',
                 enrollment_date: new Date(),
                 is_active: true
@@ -296,6 +393,13 @@ class TestHelpers {
         
         try {
             // Delete in reverse order to respect foreign key constraints
+            if (this.createdIds.relationships.length > 0) {
+                await StudentParentRelationship.destroy({
+                    where: { id: this.createdIds.relationships },
+                    transaction
+                });
+            }
+
             if (this.createdIds.students.length > 0) {
                 await Student.destroy({
                     where: { id: this.createdIds.students },
@@ -313,6 +417,13 @@ class TestHelpers {
             if (this.createdIds.parents.length > 0) {
                 await Parent.destroy({
                     where: { id: this.createdIds.parents },
+                    transaction
+                });
+            }
+
+            if (this.createdIds.users.length > 0) {
+                await AuditLog.destroy({
+                    where: { user_id: this.createdIds.users },
                     transaction
                 });
             }
@@ -339,7 +450,8 @@ class TestHelpers {
                 schools: [],
                 students: [],
                 staff: [],
-                parents: []
+                parents: [],
+                relationships: []
             };
             
         } catch (error) {
@@ -386,10 +498,9 @@ class TestHelpers {
      */
     validateUserData(userData, role = null) {
         expect(userData).toHaveProperty('id');
+        expect(userData).toHaveProperty('username');
         expect(userData).toHaveProperty('email');
         expect(userData).toHaveProperty('role');
-        expect(userData).toHaveProperty('first_name');
-        expect(userData).toHaveProperty('last_name');
         expect(userData).toHaveProperty('is_active');
         
         // Should not expose password hash

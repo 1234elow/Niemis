@@ -329,7 +329,7 @@ const customValidations = {
         const userSchoolId = req.user.school_id;
         const requestSchoolId = req.body.school_id || req.params.school_id;
 
-        if (requestSchoolId && userSchoolId && parseInt(requestSchoolId) !== parseInt(userSchoolId)) {
+        if (requestSchoolId && userSchoolId && String(requestSchoolId) !== String(userSchoolId)) {
             return res.status(403).json({
                 error: 'Validation failed',
                 details: [{

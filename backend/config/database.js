@@ -1,19 +1,27 @@
 const { Sequelize } = require('sequelize');
 const path = require('path');
-require('dotenv').config();
+require('dotenv').config({ path: path.resolve(__dirname, '..', '.env') });
 
 let sequelize;
+const databaseUrl = process.env.DATABASE_URL;
+const isTest = process.env.NODE_ENV === 'test' || Boolean(process.env.JEST_WORKER_ID);
+const isDevelopment = process.env.NODE_ENV === 'development';
+const shouldLogConnectionLifecycle = isDevelopment && !isTest;
+const hasPostgresConfig = Boolean(databaseUrl || process.env.DB_HOST);
+const allowSqliteFallback = process.env.ALLOW_SQLITE_FALLBACK === 'true';
+const shouldUsePostgres = process.env.FORCE_POSTGRES === 'true'
+    || process.env.NODE_ENV === 'production'
+    || hasPostgresConfig
+    || !allowSqliteFallback;
 
-if (process.env.NODE_ENV === 'production' || process.env.DB_HOST || process.env.DATABASE_URL) {
-    // Use PostgreSQL for production or when DB_HOST/DATABASE_URL is specified
-    const databaseUrl = process.env.DATABASE_URL;
-    
+if (shouldUsePostgres) {
+    // Use PostgreSQL by default (SQLite fallback only when ALLOW_SQLITE_FALLBACK=true)
     if (databaseUrl) {
         // Use connection URL if provided (Render.com format)
         sequelize = new Sequelize(databaseUrl, {
             dialect: 'postgres',
             schema: 'school_system',
-            logging: process.env.NODE_ENV === 'development' ? console.log : false,
+            logging: isDevelopment ? console.log : false,
             define: {
                 underscored: true,
                 freezeTableName: true,
@@ -56,31 +64,44 @@ if (process.env.NODE_ENV === 'production' || process.env.DB_HOST || process.env.
                     /SequelizeConnectionTimedOutError/
                 ]
             },
-            benchmark: process.env.NODE_ENV === 'development',
+            benchmark: isDevelopment,
             isolationLevel: Sequelize.Transaction.ISOLATION_LEVELS.READ_COMMITTED,
             hooks: {
                 beforeConnect: (config) => {
-                    console.log('Connecting to PostgreSQL database...');
+                    if (shouldLogConnectionLifecycle) {
+                        console.log('Connecting to PostgreSQL database...');
+                    }
                 },
                 afterConnect: (connection, config) => {
-                    console.log('Successfully connected to PostgreSQL database');
+                    if (shouldLogConnectionLifecycle) {
+                        console.log('Successfully connected to PostgreSQL database');
+                    }
                 },
                 beforeDisconnect: (connection) => {
-                    console.log('Disconnecting from PostgreSQL database...');
+                    if (shouldLogConnectionLifecycle) {
+                        console.log('Disconnecting from PostgreSQL database...');
+                    }
                 }
             }
         });
     } else {
+        if (!process.env.DB_HOST || !process.env.DB_NAME || !process.env.DB_USER || typeof process.env.DB_PASSWORD === 'undefined') {
+            throw new Error(
+                'Missing PostgreSQL env configuration. Set DB_HOST, DB_NAME, DB_USER, DB_PASSWORD (or DATABASE_URL). ' +
+                'If you intentionally want local SQLite, set ALLOW_SQLITE_FALLBACK=true.'
+            );
+        }
+
         // Use individual parameters
         sequelize = new Sequelize({
             dialect: 'postgres',
-            host: process.env.DB_HOST || 'localhost',
+            host: process.env.DB_HOST,
             port: process.env.DB_PORT || 5432,
-            database: process.env.DB_NAME || 'niemis_production',
-            username: process.env.DB_USER || 'niemis_user',
-            password: process.env.DB_PASSWORD || 'secure_password123',
+            database: process.env.DB_NAME,
+            username: process.env.DB_USER,
+            password: process.env.DB_PASSWORD,
             schema: 'school_system',
-            logging: process.env.NODE_ENV === 'development' ? console.log : false,
+            logging: isDevelopment ? console.log : false,
             define: {
                 underscored: true,
                 freezeTableName: true,
@@ -123,17 +144,23 @@ if (process.env.NODE_ENV === 'production' || process.env.DB_HOST || process.env.
                     /SequelizeConnectionTimedOutError/
                 ]
             },
-            benchmark: process.env.NODE_ENV === 'development',
+            benchmark: isDevelopment,
             isolationLevel: Sequelize.Transaction.ISOLATION_LEVELS.READ_COMMITTED,
             hooks: {
                 beforeConnect: (config) => {
-                    console.log('Connecting to PostgreSQL database...');
+                    if (shouldLogConnectionLifecycle) {
+                        console.log('Connecting to PostgreSQL database...');
+                    }
                 },
                 afterConnect: (connection, config) => {
-                    console.log('Successfully connected to PostgreSQL database');
+                    if (shouldLogConnectionLifecycle) {
+                        console.log('Successfully connected to PostgreSQL database');
+                    }
                 },
                 beforeDisconnect: (connection) => {
-                    console.log('Disconnecting from PostgreSQL database...');
+                    if (shouldLogConnectionLifecycle) {
+                        console.log('Disconnecting from PostgreSQL database...');
+                    }
                 }
             }
         });
@@ -144,7 +171,7 @@ if (process.env.NODE_ENV === 'production' || process.env.DB_HOST || process.env.
     sequelize = new Sequelize({
         dialect: 'sqlite',
         storage: dbPath,
-        logging: process.env.NODE_ENV === 'development' ? console.log : false,
+        logging: isDevelopment ? console.log : false,
         define: {
             underscored: true,
             freezeTableName: true,

@@ -76,6 +76,8 @@ const SchoolCard = ({ school, onEdit, onDelete, onViewDetails }) => {
 
   const formatSchoolType = (type) => {
     if (!type) return "";
+    if (type === "pre_primary") return "Pre-Primary/Nursery";
+    if (type === "nursery") return "Pre-Primary/Nursery";
     return type.replace(/_/g, " ").replace(/\b\w/g, (l) => l.toUpperCase());
   };
 
@@ -110,10 +112,10 @@ const SchoolCard = ({ school, onEdit, onDelete, onViewDetails }) => {
             <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap", mb: 1 }}>
               <Chip
                 label={formatSchoolType(
-                  school.school_category || school.school_type,
+                  school.school_type || school.school_category,
                 )}
                 color={getSchoolTypeColor(
-                  school.school_category || school.school_type,
+                  school.school_type || school.school_category,
                 )}
                 size="small"
               />

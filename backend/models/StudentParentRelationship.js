@@ -30,7 +30,8 @@ module.exports = (sequelize, DataTypes) => {
             defaultValue: false
         }
     }, {
-        tableName: 'student_parent_relationships'
+        tableName: 'student_parent_relationships',
+        timestamps: false
     });
 
     return StudentParentRelationship;

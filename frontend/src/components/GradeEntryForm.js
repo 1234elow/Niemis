@@ -37,6 +37,7 @@ import {
   CheckCircle,
   Warning,
   Error as ErrorIcon,
+  DeleteOutline,
 } from "@mui/icons-material";
 import { toast } from "react-hot-toast";
 import { apiService } from "../services/apiService";
@@ -56,6 +57,8 @@ const GRADE_TYPES = [
   { value: "project", label: "Project", color: "success" },
 ];
 
+const PERFORMANCE_BAND_OPTIONS = ["GENERAL", "A", "B", "C", "D", "F"];
+
 const GradeEntryForm = ({
   open,
   onClose,
@@ -74,11 +77,18 @@ const GradeEntryForm = ({
   const [errors, setErrors] = useState({});
   const [notes, setNotes] = useState("");
   const [gradingPolicyInfo, setGradingPolicyInfo] = useState(null);
+  const [commentTemplates, setCommentTemplates] = useState([]);
+  const [commentTemplatesLoading, setCommentTemplatesLoading] = useState(false);
+  const [selectedTemplateId, setSelectedTemplateId] = useState("");
+  const [templateLabel, setTemplateLabel] = useState("");
+  const [templateSubject, setTemplateSubject] = useState("");
+  const [templateBand, setTemplateBand] = useState("GENERAL");
 
   useEffect(() => {
     if (open && classData) {
       loadStudents();
       loadGradingPolicy();
+      loadCommentBank();
     } else {
       resetForm();
     }
@@ -134,6 +144,85 @@ const GradeEntryForm = ({
     setNotes("");
     setStudents([]);
     setGradingPolicyInfo(null);
+    setCommentTemplates([]);
+    setCommentTemplatesLoading(false);
+    setSelectedTemplateId("");
+    setTemplateLabel("");
+    setTemplateSubject("");
+    setTemplateBand("GENERAL");
+  };
+
+  const loadCommentBank = async () => {
+    try {
+      setCommentTemplatesLoading(true);
+      const response = await apiService.getTeacherCommentBank();
+      setCommentTemplates(response?.templates || []);
+    } catch (error) {
+      console.error("Error loading comment templates:", error);
+      setCommentTemplates([]);
+    } finally {
+      setCommentTemplatesLoading(false);
+    }
+  };
+
+  const selectedTemplate = commentTemplates.find(
+    (item) => String(item.id) === String(selectedTemplateId),
+  );
+
+  const handleSaveCommentTemplate = async () => {
+    const label = templateLabel.trim();
+    const commentText = notes.trim();
+    if (!label) {
+      toast.error("Template label is required.");
+      return;
+    }
+    if (!commentText) {
+      toast.error("Add assessment notes first, then save as template.");
+      return;
+    }
+
+    try {
+      await apiService.saveTeacherCommentTemplate({
+        label,
+        comment_text: commentText,
+        subject: templateSubject.trim() || classData?.name || null,
+        performance_band: templateBand,
+      });
+      toast.success("Comment template saved.");
+      setTemplateLabel("");
+      await loadCommentBank();
+    } catch (error) {
+      console.error("Error saving comment template:", error);
+      toast.error("Failed to save comment template.");
+    }
+  };
+
+  const handleDeleteCommentTemplate = async (templateId) => {
+    try {
+      await apiService.deleteTeacherCommentTemplate(templateId);
+      toast.success("Comment template removed.");
+      if (String(selectedTemplateId) === String(templateId)) {
+        setSelectedTemplateId("");
+      }
+      await loadCommentBank();
+    } catch (error) {
+      console.error("Error deleting comment template:", error);
+      toast.error("Failed to remove comment template.");
+    }
+  };
+
+  const applyTemplateToStudent = (studentId) => {
+    if (!selectedTemplate) {
+      toast.error("Select a comment template first.");
+      return;
+    }
+    setGrades((prev) => ({
+      ...prev,
+      [studentId]: {
+        ...prev[studentId],
+        notes: selectedTemplate.comment_text || "",
+      },
+    }));
   };
 
   const calculateLetterGrade = (score, maxPoints) => {
@@ -453,6 +542,91 @@ const GradeEntryForm = ({
               </Grid>
             </Paper>
 
+            <Paper sx={{ p: 3, mb: 3 }}>
+              <Typography variant="h6" gutterBottom>
+                Report Comment Bank
+              </Typography>
+              <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                Save reusable comment templates by subject and performance band, then insert
+                them quickly into student notes.
+              </Typography>
+
+              <Grid container spacing={2} alignItems="center">
+                <Grid item xs={12} md={4}>
+                  <FormControl fullWidth size="small">
+                    <InputLabel>Template</InputLabel>
+                    <Select
+                      value={selectedTemplateId}
+                      label="Template"
+                      onChange={(event) => setSelectedTemplateId(event.target.value)}
+                      disabled={commentTemplatesLoading}
+                    >
+                      <MenuItem value="">
+                        <em>Select template</em>
+                      </MenuItem>
+                      {commentTemplates.map((template) => (
+                        <MenuItem key={template.id} value={template.id}>
+                          {template.label} ({template.performance_band || "GENERAL"})
+                        </MenuItem>
+                      ))}
+                    </Select>
+                  </FormControl>
+                </Grid>
+                <Grid item xs={12} md={3}>
+                  <TextField
+                    size="small"
+                    fullWidth
+                    label="Template Label"
+                    value={templateLabel}
+                    onChange={(event) => setTemplateLabel(event.target.value)}
+                    placeholder="e.g., Steady Progress"
+                  />
+                </Grid>
+                <Grid item xs={12} md={2}>
+                  <TextField
+                    size="small"
+                    fullWidth
+                    label="Subject"
+                    value={templateSubject}
+                    onChange={(event) => setTemplateSubject(event.target.value)}
+                    placeholder="Mathematics"
+                  />
+                </Grid>
+                <Grid item xs={12} md={2}>
+                  <FormControl fullWidth size="small">
+                    <InputLabel>Band</InputLabel>
+                    <Select
+                      value={templateBand}
+                      label="Band"
+                      onChange={(event) => setTemplateBand(event.target.value)}
+                    >
+                      {PERFORMANCE_BAND_OPTIONS.map((band) => (
+                        <MenuItem key={band} value={band}>
+                          {band}
+                        </MenuItem>
+                      ))}
+                    </Select>
+                  </FormControl>
+                </Grid>
+                <Grid item xs={12} md={1}>
+                  <Button
+                    variant="outlined"
+                    fullWidth
+                    onClick={handleSaveCommentTemplate}
+                    disabled={commentTemplatesLoading}
+                  >
+                    Save
+                  </Button>
+                </Grid>
+              </Grid>
+
+              {selectedTemplate && (
+                <Alert severity="info" sx={{ mt: 2 }}>
+                  {selectedTemplate.comment_text}
+                </Alert>
+              )}
+            </Paper>
+
             {errors.general && (
               <Alert severity="error" sx={{ mb: 3 }}>
                 {errors.general}
@@ -558,15 +732,36 @@ const GradeEntryForm = ({
                           </TableCell>
                           
                           <TableCell>
-                            <TextField
-                              size="small"
-                              multiline
-                              rows={1}
-                              value={grade.notes || ""}
-                              onChange={(e) => handleNotesChange(student.id, e.target.value)}
-                              placeholder="Optional notes..."
-                              sx={{ minWidth: 150 }}
-                            />
+                            <Box sx={{ minWidth: 190 }}>
+                              <TextField
+                                size="small"
+                                multiline
+                                rows={1}
+                                value={grade.notes || ""}
+                                onChange={(e) => handleNotesChange(student.id, e.target.value)}
+                                placeholder="Optional notes..."
+                                fullWidth
+                              />
+                              <Box sx={{ mt: 0.8, display: "flex", gap: 0.8, flexWrap: "wrap" }}>
+                                <Button
+                                  size="small"
+                                  variant="text"
+                                  onClick={() => applyTemplateToStudent(student.id)}
+                                  disabled={!selectedTemplate}
+                                >
+                                  Use template
+                                </Button>
+                                {selectedTemplate && (
+                                  <IconButton
+                                    size="small"
+                                    aria-label="delete template"
+                                    onClick={() => handleDeleteCommentTemplate(selectedTemplate.id)}
+                                  >
+                                    <DeleteOutline fontSize="small" />
+                                  </IconButton>
+                                )}
+                              </Box>
+                            </Box>
                           </TableCell>
                           
                           <TableCell align="center">

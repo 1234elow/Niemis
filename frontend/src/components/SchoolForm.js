@@ -15,6 +15,16 @@ import {
 } from "@mui/material";
 import { apiService } from "../services/apiService";
 
+const normalizeSchoolTypeForForm = (value) => {
+  const normalized = String(value || "").trim().toLowerCase();
+  if (!normalized) return "";
+  if (normalized === "nursery") return "pre_primary";
+  if (["pre_primary", "primary", "secondary"].includes(normalized)) {
+    return normalized;
+  }
+  return "";
+};
+
 const SchoolForm = ({ open, onClose, school, onSuccess }) => {
   const [formData, setFormData] = useState({
     name: "",
@@ -43,20 +53,8 @@ const SchoolForm = ({ open, onClose, school, onSuccess }) => {
         setParishes(parishesData);
       } catch (error) {
         console.error("Error fetching parishes:", error);
-        // Set fallback parishes if API fails
-        setParishes([
-          { value: "St. Michael", label: "St. Michael" },
-          { value: "Christ Church", label: "Christ Church" },
-          { value: "St. Philip", label: "St. Philip" },
-          { value: "St. James", label: "St. James" },
-          { value: "St. John", label: "St. John" },
-          { value: "St. Andrew", label: "St. Andrew" },
-          { value: "St. George", label: "St. George" },
-          { value: "St. Peter", label: "St. Peter" },
-          { value: "St. Lucy", label: "St. Lucy" },
-          { value: "St. Joseph", label: "St. Joseph" },
-          { value: "St. Thomas", label: "St. Thomas" },
-        ]);
+        setParishes([]);
+        setError("Unable to load parishes from database.");
       }
     };
     fetchParishes();
@@ -69,7 +67,9 @@ const SchoolForm = ({ open, onClose, school, onSuccess }) => {
         // Edit mode - populate with existing data
         setFormData({
           name: school.name || "",
-          school_type: school.school_category || school.school_type || "",
+          school_type: normalizeSchoolTypeForForm(
+            school.school_type || school.school_category,
+          ),
           parish: school.parish || "",
           email: school.email || "",
           phone: school.phone || "",
@@ -162,6 +162,7 @@ const SchoolForm = ({ open, onClose, school, onSuccess }) => {
     try {
       const submitData = {
         ...formData,
+        school_type: normalizeSchoolTypeForForm(formData.school_type),
         capacity: formData.capacity ? parseInt(formData.capacity) : null,
       };
 

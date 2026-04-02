@@ -182,7 +182,7 @@ const requireSchoolAccess = (req, res, next) => {
     // Extract school ID from request (params, query, or body)
     const requestedSchoolId = req.params.school_id || req.query.school_id || req.body.school_id;
 
-    if (requestedSchoolId && userSchoolId && parseInt(requestedSchoolId) !== parseInt(userSchoolId)) {
+    if (requestedSchoolId && userSchoolId && String(requestedSchoolId) !== String(userSchoolId)) {
         logger.warn('Access denied - school access violation', {
             userId: req.user.id,
             userRole,
@@ -217,7 +217,7 @@ const requireStudentDataAccess = (req, res, next) => {
     if (userRole === 'student') {
         const requestedStudentId = req.params.student_id || req.params.id;
         
-        if (requestedStudentId && parseInt(requestedStudentId) !== parseInt(userId)) {
+        if (requestedStudentId && String(requestedStudentId) !== String(userId)) {
             logger.warn('Student data access violation', {
                 userId,
                 requestedStudentId,
